@@ -55,7 +55,7 @@ jobs:
           prerelease: ${{ contains(github.ref_name, '-') || startsWith(github.ref_name, 'v0.') }}
 
   macos:
-    runs-on: macos-14
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

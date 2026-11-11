@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-14]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -49,7 +49,7 @@ jobs:
 
   macos-build:
     name: macOS universal app bundle
-    runs-on: macos-14
+    runs-on: macos-latest
     needs: lint-and-test
     steps:
       - uses: actions/checkout@v4
