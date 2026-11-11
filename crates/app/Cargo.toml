@@ -1,0 +1,36 @@
+[package]
+name = "aum-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+# `deny`, not the workspace `forbid`: Slint's generated code contains an
+# `#[allow(unsafe_code)]`. Hand-written code in this crate still cannot use unsafe.
+[lints.rust]
+unsafe_code = "deny"
+
+[lib]
+name = "aum_app"
+path = "src/lib.rs"
+
+[[bin]]
+name = "agent-usage-monitor"
+path = "src/main.rs"
+
+[build-dependencies]
+slint-build = "1.18"
+
+[dependencies]
+aum-platform.workspace = true
+aum-core.workspace = true
+aum-providers.workspace = true
+aum-collector.workspace = true
+aum-store.workspace = true
+chrono.workspace = true
+tokio.workspace = true
+
+[target.'cfg(any(windows, target_os = "macos"))'.dependencies]
+single-instance = "0.3.3"
+slint = { version = "1.18", default-features = false, features = ["std", "backend-winit", "renderer-software", "compat-1-2", "unstable-winit-030", "accessibility"] }
+tray-icon = "0.24.2"

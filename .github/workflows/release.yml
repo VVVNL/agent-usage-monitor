@@ -1,0 +1,88 @@
+name: Release
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Tag must match the crate version
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}".TrimStart("v")
+          $ver = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"' | Select-Object -First 1).Matches[0].Groups[1].Value
+          if ($tag -ne $ver) { throw "Tag $tag does not match Cargo.toml version $ver" }
+
+      - run: cargo test --workspace --locked
+      - run: cargo build --release -p aum-app --locked
+
+      - name: Regenerate the third-party licence list
+        run: python scripts/third_party.py
+
+      - name: Package (unsigned)
+        shell: pwsh
+        run: |
+          $v = "${{ github.ref_name }}".TrimStart("v")
+          New-Item -ItemType Directory -Force dist | Out-Null
+          # Portable zip
+          $stage = "dist/agent-usage-monitor-$v-windows-x64"
+          New-Item -ItemType Directory -Force $stage | Out-Null
+          Copy-Item target/release/agent-usage-monitor.exe, LICENSE, README.md, docs/THIRD_PARTY.md $stage
+          Compress-Archive -Path "$stage/*" -DestinationPath "dist/agent-usage-monitor-$v-windows-x64-portable.zip"
+          Remove-Item -Recurse -Force $stage
+          # Installer
+          choco install innosetup -y --no-progress
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$v" "/DSourceExe=..\target\release\agent-usage-monitor.exe" installer\agent-usage-monitor.iss
+          # Checksums
+          Push-Location dist
+          Get-ChildItem -File | Where-Object Name -ne "SHA256SUMS.txt" | ForEach-Object {
+            "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
+          } | Set-Content SHA256SUMS.txt
+          Pop-Location
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') || startsWith(github.ref_name, 'v0.') }}
+
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Tag must match the crate version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          ver="$(grep -m1 '^version = ' Cargo.toml | sed 's/version = "\(.*\)"/\1/')"
+          [ "$tag" = "$ver" ] || { echo "Tag $tag does not match Cargo.toml version $ver"; exit 1; }
+
+      - run: cargo test --workspace --locked
+      - run: python3 scripts/third_party.py
+
+      - name: Build, sign and (if credentials exist) notarize
+        env:
+          # Optional. Without them the app is ad-hoc signed and needs right-click > Open once.
+          CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+          NOTARY_APPLE_ID: ${{ secrets.MACOS_NOTARY_APPLE_ID }}
+          NOTARY_TEAM_ID: ${{ secrets.MACOS_NOTARY_TEAM_ID }}
+          NOTARY_PASSWORD: ${{ secrets.MACOS_NOTARY_PASSWORD }}
+        run: scripts/macos-bundle.sh "${GITHUB_REF_NAME#v}"
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.dmg
+            dist/SHA256SUMS-macos.txt
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') || startsWith(github.ref_name, 'v0.') }}

@@ -1,0 +1,65 @@
+# Changelog
+
+All notable changes. Versions before 1.0 are betas.
+
+## 0.11.0 (beta)
+
+- **Session activity** for Claude Code: the widget, tray menu and tray icon show sessions that are
+  working, waiting for you (with the reason) and recently finished, from `claude agents --json`.
+  Counts only; project folders and titles are never read into the program. Unknown statuses are never
+  shown as idle, and a failed read drops the numbers instead of leaving them stale.
+- **WSL bridge** (Windows): optionally also read the sessions running inside named WSL distributions,
+  only those already running, never starting one.
+- Alerts for "needs your input" and "finished" (off by default; several at once are one alert).
+- Adaptive polling: 15 s while a session is busy, 60 s when quiet, with error backoff.
+- Verified on a real machine: the native Windows `claude.exe` path with default settings.
+- Compact widget is a little wider to fit the activity dot; wrapped hint texts in Settings no longer
+  overlap the next section.
+- **Refresh interval**: besides the 1/5/15/30 minute dropdown, Settings has a box to enter any whole
+  number of minutes from 1 to 1440. The dropdown switches to "Custom" for other values, and the tray
+  menu's interval submenu gets a "Custom: N min…" entry that opens Settings. A hand-edited value in
+  `settings.json` (for example 90 seconds) is kept exactly unless you change the interval.
+- Internal: the command runner keeps raw output bytes (for UTF-16 `wsl.exe` output).
+
+## 0.10.0 (beta)
+
+- **Codex CLI provider** (off by default): limits read from `codex app-server` (JSON-RPC), windows
+  recognised by length, extra metered buckets labelled, signed-out and API-key accounts reported
+  clearly, one retry when the first answer is empty. Built against Codex's published schema; **not yet
+  run against a real Codex**.
+- **macOS support** (menu bar item with the session percentage, widget, settings, notifications
+  through `osascript`, launch at login through a LaunchAgent, universal app bundle and DMG script,
+  CI jobs). Type-checked and unit-tested for the parts that run anywhere; **not yet run on a Mac**.
+- CLI lookup now also searches the usual install locations, because apps started from Finder or at
+  login do not inherit the terminal `PATH`.
+- Settings window: Codex section, per-provider alert switch.
+- The tray icon and menu bar text follow the busiest provider.
+- `aum --codex` queries Codex from the command line.
+- Internal: the Windows shim became the cross-platform `platform` crate; `tray_app.rs` became `shell.rs`.
+
+## 0.9.0 (beta)
+
+- **Settings window** (tray menu > Settings…): provider on/off, CLI path, refresh interval, launch at
+  login, widget options, alert levels and switches, test notification.
+- **Notifications**: alerts at 75% and 90% (adjustable), when a limit is reached, when it resets, and
+  for sign-in or read errors. One alert per limit window per level, no repeats on every poll, no repeats
+  after a restart, one-minute reset-time jitter ignored, error cooldown of six hours.
+- **Launch at login** through the per-user Run key.
+- **Installer** (per-user, no administrator rights) and portable zip, with SHA-256 checksums.
+- Timeouts now kill the whole process tree of a hung CLI (a stray child process was left behind).
+- Release binary reduced from 25 MB to 13 MB.
+- Documentation: install guide, troubleshooting, privacy and security, architecture, release checklist.
+
+## 0.2.0
+
+- **Floating widget**: progress bars coloured by level, reset countdowns, compact mode, dark and
+  light themes, adjustable opacity, always-on-top, click-through, drag to move, remembered position
+  with multi-monitor fallback, keyboard shortcuts (Esc hides, R or F5 refreshes).
+- Rendering switched to Slint's software renderer: about 23 MB working set when idle.
+
+## 0.1.0
+
+- Windows tray app for Claude Code limits: session, weekly and model-specific weekly windows with reset
+  countdowns, stale and error states, cached values across restarts, manual refresh, refresh interval,
+  single instance, clean quit.
+- Provider-capability model with explicit provenance; strict `/usage` parser that fails closed.

@@ -1,0 +1,198 @@
+// Floating usage widget. Pure presentation: all data arrives through properties
+// and all actions leave through callbacks, so the logic stays in tested Rust.
+
+export global Pal {
+    in property <bool> dark: true;
+    out property <color> bg: dark ? #1e1e22 : #f5f5f7;
+    out property <color> text: dark ? #ffffff : #1c1c1e;
+    out property <color> subtext: dark ? #a8a8b3 : #55555f;
+    out property <color> track: dark ? #4e4e56 : #d4d4da;
+    out property <color> divider: dark ? #34343b : #e0e0e6;
+    out property <color> ok: #34c759;
+    out property <color> warn: #ffb300;
+    out property <color> crit: #eb4034;
+    out property <color> unknown: dark ? #7a7a84 : #9a9aa4;
+    out property <color> accent: #0a84ff;
+    pure public function level-color(level: int) -> color {
+        level == 0 ? ok : level == 1 ? warn : level == 2 ? crit : unknown
+    }
+    // Session activity: 1 idle, 2 working, 3 finished, 4 needs input.
+    pure public function activity-color(level: int) -> color {
+        level == 4 ? warn : level == 3 ? ok : level == 2 ? accent : unknown
+    }
+}
+
+export struct BarData {
+    label: string,
+    // -1 means "not available / not current": shown as an em dash with an empty bar.
+    percent: int,
+    // 0 ok, 1 warn, 2 critical, 3 unknown
+    level: int,
+    detail: string,
+}
+
+export struct ChipData {
+    text: string,
+    // 1 idle, 2 working, 3 finished, 4 needs input
+    level: int,
+}
+
+export struct SectionData {
+    title: string,
+    problem: string,
+    updated: string,
+    stale: bool,
+    compact: string,
+    bars: [BarData],
+    chips: [ChipData],
+    activity-level: int,
+    activity-busy: int,
+}
+
+component IconButton inherits Rectangle {
+    in property <string> glyph;
+    in property <string> hint;
+    in property <bool> refresh-icon: false;
+    callback clicked();
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    background: area.has-hover ? Pal.divider : transparent;
+    accessible-role: button;
+    accessible-label: root.hint;
+    accessible-action-default => { root.clicked(); }
+    // The refresh icon is drawn as vector paths: no dependence on font glyph coverage.
+    if root.refresh-icon: Path {
+        x: (parent.width - 14px) / 2;
+        y: (parent.height - 14px) / 2;
+        width: 14px;
+        height: 14px;
+        viewbox-width: 14;
+        viewbox-height: 14;
+        commands: "M 12 7 A 5 5 0 1 1 8 2.2";
+        stroke: Pal.subtext;
+        stroke-width: 1.6px;
+        fill: transparent;
+    }
+    if root.refresh-icon: Path {
+        x: (parent.width - 14px) / 2;
+        y: (parent.height - 14px) / 2;
+        width: 14px;
+        height: 14px;
+        viewbox-width: 14;
+        viewbox-height: 14;
+        commands: "M 6 -0.2 L 10.4 2.2 L 6.2 5 Z";
+        fill: Pal.subtext;
+    }
+    if !root.refresh-icon: Text { text: root.glyph; color: Pal.subtext; font-size: 13px; horizontal-alignment: center; vertical-alignment: center; }
+    area := TouchArea { clicked => { root.clicked(); } }
+}
+
+component Bar inherits VerticalLayout {
+    in property <BarData> d;
+    spacing: 3px;
+    accessible-role: progress-indicator;
+    accessible-label: d.label;
+    accessible-value: d.percent >= 0 ? d.percent : 0;
+    accessible-value-minimum: 0;
+    accessible-value-maximum: 100;
+    HorizontalLayout {
+        Text { text: d.label; color: Pal.subtext; font-size: 11px; }
+        Text { text: d.percent >= 0 ? d.percent + "%" : "—"; color: Pal.text; font-size: 11px; font-weight: 600; horizontal-alignment: right; }
+    }
+    Rectangle {
+        height: 6px;
+        border-radius: 3px;
+        background: Pal.track;
+        Rectangle {
+            x: 0;
+            height: parent.height;
+            width: parent.width * Math.clamp(d.percent, 0, 100) / 100;
+            border-radius: 3px;
+            background: Pal.level-color(d.level);
+        }
+    }
+    Text { text: d.detail; color: Pal.subtext; font-size: 10px; }
+}
+
+export component Widget inherits Window {
+    title: "Agent Usage Monitor";
+    no-frame: true;
+    always-on-top: root.on-top;
+    background: Pal.bg;
+    // The window always takes exactly the content's size (grows and shrinks with it).
+    width: root.compact ? 240px : 250px;
+    height: content.preferred-height;
+
+    in property <[SectionData]> sections;
+    in property <bool> compact: false;
+    in property <bool> on-top: true;
+    callback start-drag();
+    callback refresh-requested();
+    callback hide-requested();
+
+    focus := FocusScope {
+        key-pressed(e) => {
+            if (e.text == Key.Escape) { root.hide-requested(); return accept; }
+            if (e.text == Key.F5 || e.text == "r") { root.refresh-requested(); return accept; }
+            reject
+        }
+
+        // Dragging: any press on the body starts a native window drag.
+        TouchArea {
+            pointer-event(e) => {
+                if (e.button == PointerEventButton.left && e.kind == PointerEventKind.down) { root.start-drag(); }
+            }
+        }
+
+        content := VerticalLayout {
+            padding: 12px;
+            spacing: 8px;
+
+            for s[i] in root.sections: VerticalLayout {
+                spacing: 6px;
+                if i > 0: Rectangle { height: 1px; background: Pal.divider; }
+
+                if root.compact: HorizontalLayout {
+                    Text { text: s.compact; color: Pal.text; font-size: 12px; font-weight: 600; vertical-alignment: center; }
+                    // Session activity: a dot in the level's colour, and how many sessions are busy.
+                    if s.activity-level > 1: VerticalLayout {
+                        alignment: center;
+                        padding-left: 8px;
+                        Rectangle { width: 8px; height: 8px; border-radius: 4px; background: Pal.activity-color(s.activity-level); }
+                    }
+                    if s.activity-busy > 0: Text { text: " " + s.activity-busy; color: Pal.subtext; font-size: 11px; vertical-alignment: center; }
+                    if s.problem != "" || s.stale: Text { text: " ⚠"; color: Pal.warn; font-size: 12px; vertical-alignment: center; }
+                    Rectangle { }
+                    if i == 0: IconButton { refresh-icon: true; hint: "Refresh"; clicked => { root.refresh-requested(); } }
+                    if i == 0: IconButton { glyph: "×"; hint: "Hide widget"; clicked => { root.hide-requested(); } }
+                }
+
+                if !root.compact: VerticalLayout {
+                    spacing: 6px;
+                    HorizontalLayout {
+                        Text { text: s.title; color: Pal.text; font-size: 13px; font-weight: 700; vertical-alignment: center; }
+                        Rectangle { }
+                        if i == 0: IconButton { refresh-icon: true; hint: "Refresh"; clicked => { root.refresh-requested(); } }
+                        if i == 0: IconButton { glyph: "×"; hint: "Hide widget"; clicked => { root.hide-requested(); } }
+                    }
+                    if s.problem != "": Text { text: "⚠ " + s.problem; color: Pal.warn; font-size: 11px; wrap: word-wrap; }
+                    for b in s.bars: Bar { d: b; }
+                    for c in s.chips: HorizontalLayout {
+                        spacing: 6px;
+                        accessible-role: text;
+                        accessible-label: "Sessions: " + c.text;
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle { width: 8px; height: 8px; border-radius: 4px; background: Pal.activity-color(c.level); }
+                        }
+                        Text { text: c.text; color: c.level == 4 ? Pal.warn : Pal.text; font-size: 11px; font-weight: c.level == 4 ? 600 : 400; wrap: word-wrap; }
+                    }
+                    Text { text: s.updated; color: s.stale ? Pal.warn : Pal.subtext; font-size: 10px; }
+                }
+            }
+
+            if root.sections.length == 0: Text { text: "No providers enabled"; color: Pal.subtext; font-size: 12px; }
+        }
+    }
+}

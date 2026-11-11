@@ -1,0 +1,21 @@
+[package]
+name = "aum-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "aum"
+path = "src/main.rs"
+
+[dependencies]
+aum-core.workspace = true
+aum-providers.workspace = true
+aum-collector.workspace = true
+chrono.workspace = true
+serde_json.workspace = true
+tokio.workspace = true

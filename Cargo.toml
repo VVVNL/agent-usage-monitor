@@ -1,0 +1,37 @@
+[workspace]
+resolver = "3"
+members = ["crates/core", "crates/providers", "crates/collector", "crates/store", "crates/cli", "crates/app", "crates/platform"]
+
+[workspace.package]
+version = "0.11.0"
+edition = "2024"
+license = "MIT"
+rust-version = "1.85"
+
+[workspace.dependencies]
+aum-core = { path = "crates/core" }
+aum-providers = { path = "crates/providers" }
+aum-collector = { path = "crates/collector" }
+aum-store = { path = "crates/store" }
+aum-platform = { path = "crates/platform" }
+async-trait = "0.1"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
+chrono-tz = "0.10"
+directories = "6"
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tempfile = "3"
+thiserror = "2"
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "process", "time", "sync", "io-util"] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+# Smaller, faster-starting release binary. Unwinding stays enabled on purpose: the
+# collector relies on catching a panicking provider task.
+[profile.release]
+opt-level = "s"
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

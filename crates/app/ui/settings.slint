@@ -1,0 +1,289 @@
+import { Switch, ComboBox, Slider, SpinBox, LineEdit, Button, ScrollView, AboutSlint } from "std-widgets.slint";
+
+export struct SettingsForm {
+    claude-enabled: bool,
+    cli-path: string,
+    // Display only: the dropdown position (0 to 3 = preset, 4 = custom). `interval-minutes` is the value.
+    interval-index: int,
+    interval-minutes: int,
+    launch-at-login: bool,
+    widget-visible: bool,
+    on-top: bool,
+    compact: bool,
+    theme-index: int,
+    opacity: int,
+    notify-enabled: bool,
+    warn: int,
+    critical: int,
+    exhausted: bool,
+    reset: bool,
+    errors: bool,
+    codex-enabled: bool,
+    codex-cli-path: string,
+    codex-notify-enabled: bool,
+    activity-enabled: bool,
+    activity-alert-needs-input: bool,
+    activity-alert-finished: bool,
+    activity-alert-min-secs: int,
+    activity-finished-minutes: int,
+    wsl-distros: string,
+    wsl-claude-path: string,
+}
+
+component Section inherits VerticalLayout {
+    in property <string> heading;
+    spacing: 8px;
+    Text { text: root.heading; font-size: 14px; font-weight: 700; }
+    Rectangle { height: 1px; background: #80808040; }
+}
+
+component Row inherits HorizontalLayout {
+    in property <string> label;
+    spacing: 12px;
+    alignment: space-between;
+    Text { text: root.label; vertical-alignment: center; }
+}
+
+export component SettingsWindow inherits Window {
+    title: "Agent Usage Monitor: Settings";
+    preferred-width: 400px;
+    preferred-height: 640px;
+    min-width: 360px;
+    min-height: 300px;
+
+    in-out property <SettingsForm> form;
+    in property <string> message;
+    in property <string> version;
+    // Only Windows has WSL.
+    in property <bool> show-wsl: false;
+    callback changed(SettingsForm);
+    callback test-notification();
+
+    ScrollView {
+        VerticalLayout {
+            padding: 16px;
+            spacing: 18px;
+
+            Section {
+                heading: "Claude Code";
+                Switch {
+                    text: "Monitor Claude Code";
+                    checked: root.form.claude-enabled;
+                    toggled => { root.form.claude-enabled = self.checked; root.changed(root.form); }
+                }
+                Text { text: "Path to the claude program (leave empty to find it automatically)"; font-size: 11px; height: 30px; wrap: word-wrap; opacity: 0.7; }
+                LineEdit {
+                    text: root.form.cli-path;
+                    placeholder-text: "Automatic";
+                    accessible-label: "Claude CLI path";
+                    accepted(t) => { root.form.cli-path = t; root.changed(root.form); }
+                    changed has-focus => { if (!self.has-focus) { root.form.cli-path = self.text; root.changed(root.form); } }
+                }
+            }
+
+            Section {
+                heading: "Codex CLI";
+                Switch {
+                    text: "Monitor Codex CLI";
+                    checked: root.form.codex-enabled;
+                    toggled => { root.form.codex-enabled = self.checked; root.changed(root.form); }
+                }
+                Text { text: "Needs Codex installed and signed in with ChatGPT. Path to the codex program (empty = automatic)"; font-size: 11px; height: 44px; wrap: word-wrap; opacity: 0.7; }
+                LineEdit {
+                    text: root.form.codex-cli-path;
+                    placeholder-text: "Automatic";
+                    accessible-label: "Codex CLI path";
+                    accepted(t) => { root.form.codex-cli-path = t; root.changed(root.form); }
+                    changed has-focus => { if (!self.has-focus) { root.form.codex-cli-path = self.text; root.changed(root.form); } }
+                }
+                Switch {
+                    text: "Alerts for Codex CLI";
+                    checked: root.form.codex-notify-enabled;
+                    toggled => { root.form.codex-notify-enabled = self.checked; root.changed(root.form); }
+                }
+            }
+
+            Section {
+                heading: "Session activity";
+                Text { text: "Shows whether Claude Code sessions are working, waiting for you, or recently finished. Counts only: no project names or conversation text are read."; font-size: 11px; height: 58px; wrap: word-wrap; opacity: 0.7; }
+                Switch {
+                    text: "Show session activity";
+                    checked: root.form.activity-enabled;
+                    toggled => { root.form.activity-enabled = self.checked; root.changed(root.form); }
+                }
+                Row {
+                    label: "Keep \"finished\" visible (minutes)";
+                    SpinBox {
+                        minimum: 1;
+                        maximum: 120;
+                        value: root.form.activity-finished-minutes;
+                        edited(v) => { root.form.activity-finished-minutes = v; root.changed(root.form); }
+                    }
+                }
+                Switch {
+                    text: "Alert when a session needs my input";
+                    checked: root.form.activity-alert-needs-input;
+                    toggled => { root.form.activity-alert-needs-input = self.checked; root.changed(root.form); }
+                }
+                Switch {
+                    text: "Alert when a session finishes";
+                    checked: root.form.activity-alert-finished;
+                    toggled => { root.form.activity-alert-finished = self.checked; root.changed(root.form); }
+                }
+                Row {
+                    label: "…only if it ran at least (seconds)";
+                    SpinBox {
+                        minimum: 0;
+                        maximum: 3600;
+                        value: root.form.activity-alert-min-secs;
+                        edited(v) => { root.form.activity-alert-min-secs = v; root.changed(root.form); }
+                    }
+                }
+                if root.show-wsl: Text { text: "Windows: also look inside WSL. Sessions started by the Claude desktop app often run there. Only distributions that are already running are asked; a stopped one is never started. Separate names with commas (for example Ubuntu)."; font-size: 11px; height: 76px; wrap: word-wrap; opacity: 0.7; }
+                if root.show-wsl: LineEdit {
+                    text: root.form.wsl-distros;
+                    placeholder-text: "WSL distributions (empty = off)";
+                    accessible-label: "WSL distributions";
+                    accepted(t) => { root.form.wsl-distros = t; root.changed(root.form); }
+                    changed has-focus => { if (!self.has-focus) { root.form.wsl-distros = self.text; root.changed(root.form); } }
+                }
+                if root.show-wsl: LineEdit {
+                    text: root.form.wsl-claude-path;
+                    placeholder-text: "Path to claude inside WSL (empty = automatic)";
+                    accessible-label: "Path to claude inside WSL";
+                    accepted(t) => { root.form.wsl-claude-path = t; root.changed(root.form); }
+                    changed has-focus => { if (!self.has-focus) { root.form.wsl-claude-path = self.text; root.changed(root.form); } }
+                }
+            }
+
+            Section {
+                heading: "Refresh";
+                Row {
+                    label: "Check usage every";
+                    interval-box := ComboBox {
+                        model: ["1 minute", "5 minutes", "15 minutes", "30 minutes", "Custom"];
+                        current-index: root.form.interval-index;
+                        selected(v) => {
+                            // Picking a preset also fills the number box; "Custom" keeps what is there.
+                            if (self.current-index < 4) {
+                                root.form.interval-minutes = self.current-index == 0 ? 1 : self.current-index == 1 ? 5 : self.current-index == 2 ? 15 : 30;
+                                interval-spin.value = root.form.interval-minutes;
+                            }
+                            root.form.interval-index = self.current-index;
+                            root.changed(root.form);
+                        }
+                    }
+                }
+                Row {
+                    label: "…or enter minutes (1 to 1440)";
+                    interval-spin := SpinBox {
+                        minimum: 1;
+                        maximum: 1440;
+                        value: root.form.interval-minutes;
+                        accessible-label: "Refresh interval in minutes";
+                        edited(v) => {
+                            root.form.interval-minutes = v;
+                            // Typing a preset's value selects that preset; anything else is "Custom".
+                            root.form.interval-index = v == 1 ? 0 : v == 5 ? 1 : v == 15 ? 2 : v == 30 ? 3 : 4;
+                            interval-box.current-index = root.form.interval-index;
+                            root.changed(root.form);
+                        }
+                    }
+                }
+                Switch {
+                    text: "Launch at login";
+                    checked: root.form.launch-at-login;
+                    toggled => { root.form.launch-at-login = self.checked; root.changed(root.form); }
+                }
+            }
+
+            Section {
+                heading: "Floating widget";
+                Switch {
+                    text: "Show widget";
+                    checked: root.form.widget-visible;
+                    toggled => { root.form.widget-visible = self.checked; root.changed(root.form); }
+                }
+                Switch {
+                    text: "Always on top";
+                    checked: root.form.on-top;
+                    toggled => { root.form.on-top = self.checked; root.changed(root.form); }
+                }
+                Switch {
+                    text: "Compact mode";
+                    checked: root.form.compact;
+                    toggled => { root.form.compact = self.checked; root.changed(root.form); }
+                }
+                Row {
+                    label: "Theme";
+                    ComboBox {
+                        model: ["Dark", "Light"];
+                        current-index: root.form.theme-index;
+                        selected(v) => { root.form.theme-index = self.current-index; root.changed(root.form); }
+                    }
+                }
+                Row {
+                    label: "Opacity: " + root.form.opacity + "%";
+                    Slider {
+                        width: 170px;
+                        minimum: 30;
+                        maximum: 100;
+                        value: root.form.opacity;
+                        accessible-label: "Widget opacity";
+                        released(v) => { root.form.opacity = Math.round(v); root.changed(root.form); }
+                    }
+                }
+            }
+
+            Section {
+                heading: "Notifications";
+                Switch {
+                    text: "Show alerts";
+                    checked: root.form.notify-enabled;
+                    toggled => { root.form.notify-enabled = self.checked; root.changed(root.form); }
+                }
+                Row {
+                    label: "First alert at (% used)";
+                    SpinBox {
+                        minimum: 1;
+                        maximum: 98;
+                        value: root.form.warn;
+                        edited(v) => { root.form.warn = v; root.changed(root.form); }
+                    }
+                }
+                Row {
+                    label: "Second alert at (% used)";
+                    SpinBox {
+                        minimum: 2;
+                        maximum: 99;
+                        value: root.form.critical;
+                        edited(v) => { root.form.critical = v; root.changed(root.form); }
+                    }
+                }
+                Switch {
+                    text: "When a limit is reached";
+                    checked: root.form.exhausted;
+                    toggled => { root.form.exhausted = self.checked; root.changed(root.form); }
+                }
+                Switch {
+                    text: "When a limit resets";
+                    checked: root.form.reset;
+                    toggled => { root.form.reset = self.checked; root.changed(root.form); }
+                }
+                Switch {
+                    text: "Sign-in and read errors";
+                    checked: root.form.errors;
+                    toggled => { root.form.errors = self.checked; root.changed(root.form); }
+                }
+                Button { text: "Send a test notification"; clicked => { root.test-notification(); } }
+            }
+
+            if root.message != "": Text { text: root.message; color: #e0a000; wrap: word-wrap; }
+            Text { text: "Changes apply immediately. Version " + root.version; font-size: 11px; opacity: 0.6; }
+
+            // Attribution required by Slint's royalty-free licence.
+            Rectangle { height: 1px; background: #80808040; }
+            AboutSlint { height: 90px; }
+        }
+    }
+}

@@ -1,0 +1,1 @@
+[{"pid":4101,"cwd":"/home/user/project-a","kind":"interactive","startedAt":1794300000000,"sessionId":"00000000-0000-0000-0000-000000000001","name":"REDACTED","status":"busy"},{"pid":4102,"cwd":"/home/user/project-b","kind":"interactive","startedAt":1794300600000,"sessionId":"00000000-0000-0000-0000-000000000002","name":"REDACTED","status":"idle"}]
