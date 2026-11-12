@@ -1116,6 +1116,7 @@ fn run_inner() -> Result<(), String> {
         });
         widget.on_refresh_requested(|| with_app(|a| a.refresh()));
         widget.on_hide_requested(|| with_app(|a| a.set_widget_visible(false)));
+        widget.on_toggle_compact_requested(|| with_app(|a| a.on_menu("widget:compact")));
         widget.window().on_close_requested(|| {
             // e.g. Alt+F4: hide instead of quitting, and remember the choice.
             let _ = slint::invoke_from_event_loop(|| with_app(|a| a.set_widget_visible(false)));

@@ -4,6 +4,8 @@ All notable changes. Versions before 1.0 are betas.
 
 ## Unreleased
 
+- **Compact toggle on the widget**: a chevron button next to Refresh switches between the full and
+  compact widget (same setting as Widget → Compact mode in the tray menu, so the two stay in sync).
 - **Fixed: widget position after plugging in or removing a display.** Windows moves the widget by
   itself when the monitor layout changes, and the app saved those forced moves over the position you
   had chosen, so it never went back to its spot when the display returned. The app now notices layout

@@ -53,6 +53,8 @@ component IconButton inherits Rectangle {
     in property <string> glyph;
     in property <string> hint;
     in property <bool> refresh-icon: false;
+    // Chevron icon: -1 none, 0 points up (collapse to compact), 1 points down (expand).
+    in property <int> chevron: -1;
     callback clicked();
     width: 22px;
     height: 22px;
@@ -84,7 +86,19 @@ component IconButton inherits Rectangle {
         commands: "M 6 -0.2 L 10.4 2.2 L 6.2 5 Z";
         fill: Pal.subtext;
     }
-    if !root.refresh-icon: Text { text: root.glyph; color: Pal.subtext; font-size: 13px; horizontal-alignment: center; vertical-alignment: center; }
+    if root.chevron >= 0: Path {
+        x: (parent.width - 14px) / 2;
+        y: (parent.height - 14px) / 2;
+        width: 14px;
+        height: 14px;
+        viewbox-width: 14;
+        viewbox-height: 14;
+        commands: root.chevron == 0 ? "M 3 9 L 7 5 L 11 9" : "M 3 5 L 7 9 L 11 5";
+        stroke: Pal.subtext;
+        stroke-width: 1.6px;
+        fill: transparent;
+    }
+    if !root.refresh-icon && root.chevron < 0: Text { text: root.glyph; color: Pal.subtext; font-size: 13px; horizontal-alignment: center; vertical-alignment: center; }
     area := TouchArea { clicked => { root.clicked(); } }
 }
 
@@ -130,6 +144,7 @@ export component Widget inherits Window {
     callback start-drag();
     callback refresh-requested();
     callback hide-requested();
+    callback toggle-compact-requested();
 
     focus := FocusScope {
         key-pressed(e) => {
@@ -164,6 +179,7 @@ export component Widget inherits Window {
                     if s.activity-busy > 0: Text { text: " " + s.activity-busy; color: Pal.subtext; font-size: 11px; vertical-alignment: center; }
                     if s.problem != "" || s.stale: Text { text: " ⚠"; color: Pal.warn; font-size: 12px; vertical-alignment: center; }
                     Rectangle { }
+                    if i == 0: IconButton { chevron: root.compact ? 1 : 0; hint: root.compact ? "Expand widget" : "Compact mode"; clicked => { root.toggle-compact-requested(); } }
                     if i == 0: IconButton { refresh-icon: true; hint: "Refresh"; clicked => { root.refresh-requested(); } }
                     if i == 0: IconButton { glyph: "×"; hint: "Hide widget"; clicked => { root.hide-requested(); } }
                 }
@@ -173,6 +189,7 @@ export component Widget inherits Window {
                     HorizontalLayout {
                         Text { text: s.title; color: Pal.text; font-size: 13px; font-weight: 700; vertical-alignment: center; }
                         Rectangle { }
+                        if i == 0: IconButton { chevron: root.compact ? 1 : 0; hint: root.compact ? "Expand widget" : "Compact mode"; clicked => { root.toggle-compact-requested(); } }
                         if i == 0: IconButton { refresh-icon: true; hint: "Refresh"; clicked => { root.refresh-requested(); } }
                         if i == 0: IconButton { glyph: "×"; hint: "Hide widget"; clicked => { root.hide-requested(); } }
                     }
