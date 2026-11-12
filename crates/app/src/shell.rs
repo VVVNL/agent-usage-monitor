@@ -7,9 +7,10 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use aum_app::activity::{self, ActivityView, Tracker};
+use aum_app::display::LayoutWatch;
 use aum_app::form::{self, Form};
 use aum_app::widget::{self, WidgetModel};
 use aum_app::{icon, notify, view};
@@ -47,6 +48,10 @@ const OPACITIES: [u8; 4] = [100, 85, 70, 50];
 const TICK: Duration = Duration::from_secs(60);
 /// Wait this long after the last move before writing the position to disk.
 const SAVE_POS_DELAY: Duration = Duration::from_millis(600);
+/// How often the monitor layout is compared while the widget is visible. Plugging a display in
+/// or out does not always produce a window event (when the widget is not touched by the change),
+/// and the comparison is a handful of cheap system calls.
+const DISPLAY_POLL: Duration = Duration::from_secs(2);
 /// Logical size used to place the widget before its real size is known.
 const ESTIMATED_SIZE: (f32, f32) = (250.0, 170.0);
 
@@ -452,6 +457,12 @@ struct App {
     last_widget_model: Option<WidgetModel>,
     _tick: Timer,
     retry: Timer,
+    /// Second pass after a display change, once the system has finished moving windows.
+    settle: Timer,
+    /// Watches the monitor layout while the widget is visible (see `DISPLAY_POLL`).
+    display_poll: Timer,
+    /// Last monitor layout seen; lets us tell display changes from the user dragging the widget.
+    layout: Rc<RefCell<LayoutWatch>>,
     notifier: notify::Engine,
     settings_win: Option<SettingsWindow>,
     /// One tracker per provider: it turns activity snapshots into events and "finished" memory.
@@ -684,6 +695,73 @@ impl App {
         })
     }
 
+    /// The monitor layout now: the platform module where it can tell, otherwise winit.
+    fn layout_now(&self) -> Vec<aum_store::Rect> {
+        let found = aum_platform::monitors();
+        if found.is_empty() {
+            self.winit_monitors().unwrap_or_default()
+        } else {
+            found
+        }
+    }
+
+    /// A monitor was plugged in or removed, or the resolution or scaling changed. Windows moves
+    /// the widget by itself in that case and may drop our native tweaks, so: put it where the
+    /// user's saved position says it belongs (or the default corner if that is gone), re-apply
+    /// opacity and rounding, and repaint. Run again once things have settled.
+    fn on_display_change(&mut self) {
+        if !self.settings.widget_visible {
+            return;
+        }
+        diag("display layout changed");
+        self.reposition_widget();
+        self.apply_widget_settings();
+        self.refresh_widget(true);
+        self.settle
+            .start(TimerMode::SingleShot, Duration::from_millis(1500), || {
+                with_app(|a| {
+                    a.reposition_widget();
+                    a.apply_native(0);
+                    a.refresh_widget(true);
+                })
+            });
+    }
+
+    /// Move the widget to where the saved position (not wherever the system last put it) says,
+    /// if that spot is reachable on the current monitors.
+    fn reposition_widget(&mut self) {
+        let monitors = self.layout_now();
+        if monitors.is_empty() {
+            return;
+        }
+        let size = self.widget.window().size();
+        if size.width == 0 || size.height == 0 {
+            return;
+        }
+        let pos = aum_store::place_widget(
+            self.settings.widget_pos,
+            (size.width as i32, size.height as i32),
+            &monitors,
+        );
+        let target = slint::PhysicalPosition::new(pos.x, pos.y);
+        if self.widget.window().position() != target {
+            self.widget.window().set_position(target);
+        }
+    }
+
+    /// Called every `DISPLAY_POLL` while the widget is visible: catches display changes that
+    /// produced no window event.
+    fn check_display_layout(&mut self) {
+        if !self.settings.widget_visible {
+            return;
+        }
+        let now = self.layout_now();
+        let changed = self.layout.borrow_mut().observe(&now, Instant::now());
+        if changed {
+            self.on_display_change();
+        }
+    }
+
     fn show_widget(&mut self) {
         self.apply_widget_settings();
         self.refresh_widget(true);
@@ -716,6 +794,10 @@ impl App {
             }
         }
         self.apply_native(5);
+        self.display_poll
+            .start(TimerMode::Repeated, DISPLAY_POLL, || {
+                with_app(App::check_display_layout)
+            });
     }
 
     fn set_widget_visible(&mut self, visible: bool) {
@@ -724,6 +806,7 @@ impl App {
         if visible {
             self.show_widget();
         } else {
+            self.display_poll.stop();
             let _ = self.widget.hide();
         }
         self.sync_menu();
@@ -1020,6 +1103,7 @@ fn run_inner() -> Result<(), String> {
         .map_err(|e| e.to_string())?;
 
     // Widget window (created hidden; shown by `show_widget`).
+    let layout = Rc::new(RefCell::new(LayoutWatch::new(aum_platform::monitors())));
     let widget = Widget::new().map_err(|e| e.to_string())?;
     {
         let weak = widget.as_weak();
@@ -1040,19 +1124,41 @@ fn run_inner() -> Result<(), String> {
 
         // Debounced position persistence. The handler must not touch the app
         // directly: moves can be triggered synchronously from inside app code.
+        //
+        // Moves made by the system while the monitor layout changes (a display plugged in or
+        // removed, a resolution or scaling change) are not the user's choice and must not
+        // overwrite the saved position, or the widget never returns to its spot.
         let pending: Rc<Cell<Option<WidgetPos>>> = Rc::new(Cell::new(None));
         let timer = Rc::new(Timer::default());
         widget.window().on_winit_window_event({
-            let (pending, timer) = (pending.clone(), timer.clone());
+            let (pending, timer, layout) = (pending.clone(), timer.clone(), layout.clone());
             move |_, event| {
-                if let winit::event::WindowEvent::Moved(p) = event {
-                    pending.set(Some(WidgetPos { x: p.x, y: p.y }));
-                    let pending = pending.clone();
-                    timer.start(TimerMode::SingleShot, SAVE_POS_DELAY, move || {
-                        if let Some(pos) = pending.take() {
-                            with_app(|a| a.save_position(pos));
-                        }
-                    });
+                use winit::event::WindowEvent as E;
+                if matches!(
+                    event,
+                    E::Moved(_) | E::Resized(_) | E::ScaleFactorChanged { .. }
+                ) {
+                    let now = Instant::now();
+                    // `monitors()` is empty where the platform module cannot list them (macOS);
+                    // the watch then never reports a change and behaviour is unchanged.
+                    let changed = layout.borrow_mut().observe(&aum_platform::monitors(), now);
+                    if changed {
+                        pending.set(None);
+                        let _ = slint::invoke_from_event_loop(|| {
+                            with_app(|a| a.on_display_change());
+                        });
+                    }
+                    if let E::Moved(p) = event
+                        && layout.borrow().is_user_move(now)
+                    {
+                        pending.set(Some(WidgetPos { x: p.x, y: p.y }));
+                        let pending = pending.clone();
+                        timer.start(TimerMode::SingleShot, SAVE_POS_DELAY, move || {
+                            if let Some(pos) = pending.take() {
+                                with_app(|a| a.save_position(pos));
+                            }
+                        });
+                    }
                 }
                 EventResult::Propagate
             }
@@ -1105,6 +1211,9 @@ fn run_inner() -> Result<(), String> {
         last_widget_model: None,
         _tick: tick,
         retry: Timer::default(),
+        settle: Timer::default(),
+        display_poll: Timer::default(),
+        layout,
         notifier,
         settings_win: None,
         trackers: HashMap::new(),

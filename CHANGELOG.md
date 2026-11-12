@@ -2,6 +2,17 @@
 
 All notable changes. Versions before 1.0 are betas.
 
+## Unreleased
+
+- **Fixed: widget position after plugging in or removing a display.** Windows moves the widget by
+  itself when the monitor layout changes, and the app saved those forced moves over the position you
+  had chosen, so it never went back to its spot when the display returned. The app now notices layout
+  changes (resolution, scaling, monitors added or removed; checked every 2 s while the widget is
+  visible), ignores the system's moves, puts the widget at your saved spot if it is reachable (the
+  default corner if not, without forgetting the saved spot), and re-applies opacity and rounded
+  corners. Not yet verified on a real second monitor, and macOS cannot list monitors in this code
+  path, so it is unchanged there.
+
 ## 0.11.0 (beta)
 
 - **Session activity** for Claude Code: the widget, tray menu and tray icon show sessions that are
