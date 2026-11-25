@@ -4,6 +4,12 @@ on:
     branches: [main]
   pull_request:
 
+# A newer push to the same branch or pull request cancels the older run, so a stuck run cannot
+# pile up behind new ones.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -14,7 +20,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest]
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -29,6 +36,7 @@ jobs:
     name: Windows release build
     runs-on: windows-latest
     needs: lint-and-test
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -47,14 +55,21 @@ jobs:
             target/release/agent-usage-monitor.exe
             dist/*-setup.exe
 
+  # macOS runners are opt-in: a job waiting for a runner that never arrives (billing or plan
+  # limits) keeps the whole run "queued" and cannot be cancelled normally. Turn on with the
+  # repository variable MACOS_CI=true (Settings > Secrets and variables > Actions > Variables).
   macos-build:
-    name: macOS universal app bundle
+    name: macOS tests and universal app bundle
+    if: ${{ vars.MACOS_CI == 'true' }}
     runs-on: macos-latest
     needs: lint-and-test
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
       - name: Build the app bundle and DMG (ad-hoc signed)
         run: scripts/macos-bundle.sh 0.0.0-ci
       - uses: actions/upload-artifact@v4

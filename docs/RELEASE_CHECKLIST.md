@@ -36,7 +36,8 @@ Use for every release. Tick each box in the release PR.
 
 ## macOS (while macOS support is unproven, do all of this on a real Mac)
 
-- [ ] The release workflow produced `agent-usage-monitor-<version>-macos-universal.dmg` and
+- [ ] The repository variable `MACOS_CI` is `true` (the macOS jobs are opt-in, see below), and the
+      release workflow produced `agent-usage-monitor-<version>-macos-universal.dmg` and
       `SHA256SUMS-macos.txt`.
 - [ ] On Apple Silicon **and** an Intel Mac (or Rosetta): right-click > Open works; menu bar item shows
       real limits within 30 seconds; no Dock icon; widget placed top-right below the menu bar;
@@ -61,3 +62,11 @@ Use for every release. Tick each box in the release PR.
 - [ ] Watch for reports of a Claude Code update changing `/usage` wording; the parser is the most
       likely thing to break.
 - [ ] Open the next milestone.
+
+## CI notes
+
+- The macOS CI and release jobs only run when the repository variable `MACOS_CI` is `true`
+  (Settings > Secrets and variables > Actions > Variables). They are off by default because a macOS job
+  that never gets a runner (plan or billing limits) leaves the whole run queued and hard to cancel.
+- Every job has a `timeout-minutes`, and `ci.yml` cancels an older run when a newer push arrives on the
+  same branch. Neither helps a job still *waiting for a runner*, which only times out after 24 hours.

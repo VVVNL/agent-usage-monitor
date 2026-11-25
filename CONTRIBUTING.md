@@ -18,7 +18,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-CI runs the same on Linux and Windows. GUI behaviour needs a real Windows session; say in the pull
+CI runs the same on Linux and Windows (macOS jobs are opt-in, see `docs/RELEASE_CHECKLIST.md`). GUI behaviour needs a real Windows session; say in the pull
 request what you verified and how, and what you could not.
 
 ## Parser changes

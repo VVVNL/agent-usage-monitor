@@ -4,6 +4,8 @@ All notable changes. Versions before 1.0 are betas.
 
 ## Unreleased
 
+- CI: macOS jobs are opt-in (`MACOS_CI` repository variable), every job has a timeout, and a newer
+  push cancels the older CI run, so a macOS job waiting for a runner cannot leave a run stuck.
 - **Compact toggle on the widget**: a chevron button next to Refresh switches between the full and
   compact widget (same setting as Widget → Compact mode in the tray menu, so the two stay in sync).
 - **Fixed: widget position after plugging in or removing a display.** Windows moves the widget by
