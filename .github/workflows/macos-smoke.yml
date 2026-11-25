@@ -1,18 +1,23 @@
 name: macOS smoke test
 
-# Downloads a published macOS DMG, installs the app the way a user would and tries to start it on a
-# real macOS runner. The findings are written as workflow annotations (readable on the run page and
-# through the API without logging in). Runs when this file changes, or by hand
-# (Actions > macOS smoke test > Run workflow) with a release tag.
+# Gets a macOS DMG (a published release, or one built from this commit), installs the app the way a
+# user would and tries to start it on a real macOS runner. The findings are written as workflow
+# annotations (readable on the run page and through the API without logging in). Runs when this file
+# or the macOS-relevant code changes (testing a DMG built from that commit), or by hand
+# (Actions > macOS smoke test > Run workflow) with a release tag to test that release instead.
 on:
   push:
     paths:
       - ".github/workflows/macos-smoke.yml"
+      - "crates/app/**"
+      - "crates/platform/**"
+      - "packaging/macos/**"
+      - "scripts/macos-bundle.sh"
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag whose DMG to test"
-        default: "v0.11.0"
+        description: "Release tag whose DMG to test; leave empty to build this commit and test that"
+        default: ""
 
 permissions:
   contents: read
@@ -20,11 +25,12 @@ permissions:
 jobs:
   smoke:
     runs-on: macos-latest
-    timeout-minutes: 15
+    timeout-minutes: 40
     env:
-      TAG: ${{ inputs.tag || 'v0.11.0' }}
+      TAG: ${{ inputs.tag }}
       APP_NAME: Agent Usage Monitor
     steps:
+      - uses: actions/checkout@v6
       - name: Helper for annotations
         run: |
           cat > "$RUNNER_TEMP/annot.sh" <<'SH'
@@ -36,18 +42,34 @@ jobs:
           }
           SH
 
-      - name: Download and install the DMG
+      - uses: dtolnay/rust-toolchain@stable
+        if: ${{ env.TAG == '' }}
+      - uses: Swatinem/rust-cache@v2
+        if: ${{ env.TAG == '' }}
+
+      - name: Get the DMG (download a release, or build this commit)
         run: |
           set -x
-          V="${TAG#v}"
-          curl -fsSL -o "$RUNNER_TEMP/app.dmg" "https://github.com/VVVNL/agent-usage-monitor/releases/download/$TAG/agent-usage-monitor-$V-macos-universal.dmg"
+          if [ -n "$TAG" ]; then
+            V="${TAG#v}"
+            curl -fsSL -o "$RUNNER_TEMP/app.dmg" "https://github.com/VVVNL/agent-usage-monitor/releases/download/$TAG/agent-usage-monitor-$V-macos-universal.dmg"
+          else
+            scripts/macos-bundle.sh 0.0.0-smoke
+            cp dist/agent-usage-monitor-0.0.0-smoke-macos-universal.dmg "$RUNNER_TEMP/app.dmg"
+          fi
+
+      - name: Install the app
+        run: |
+          set -x
           hdiutil attach -nobrowse -readonly -mountpoint "$RUNNER_TEMP/mnt" "$RUNNER_TEMP/app.dmg"
           mkdir -p "$HOME/Applications-test"
           cp -R "$RUNNER_TEMP/mnt/$APP_NAME.app" "$HOME/Applications-test/"
           hdiutil detach "$RUNNER_TEMP/mnt" || true
 
       - name: Inspect the bundle
+        if: always()
         run: |
+          set +e
           . "$RUNNER_TEMP/annot.sh"
           APP="$HOME/Applications-test/$APP_NAME.app"
           BIN="$APP/Contents/MacOS/agent-usage-monitor"
@@ -68,7 +90,9 @@ jobs:
           annot "1 bundle inspection" "$RUNNER_TEMP/inspect.txt"
 
       - name: Start the binary directly
+        if: always()
         run: |
+          set +e
           . "$RUNNER_TEMP/annot.sh"
           BIN="$HOME/Applications-test/$APP_NAME.app/Contents/MacOS/agent-usage-monitor"
           {
@@ -90,6 +114,7 @@ jobs:
       - name: Crash report and unified log
         if: always()
         run: |
+          set +e
           . "$RUNNER_TEMP/annot.sh"
           {
             for f in "$HOME"/Library/Logs/DiagnosticReports/agent-usage-monitor*; do
@@ -104,6 +129,7 @@ jobs:
       - name: Start through Launch Services (like double-clicking)
         if: always()
         run: |
+          set +e
           . "$RUNNER_TEMP/annot.sh"
           pkill -f agent-usage-monitor || true
           sleep 1
@@ -118,3 +144,13 @@ jobs:
           } > "$RUNNER_TEMP/open.txt" 2>&1
           cat "$RUNNER_TEMP/open.txt"
           annot "4 launch services" "$RUNNER_TEMP/open.txt"
+
+      - name: Verdict
+        if: always()
+        run: |
+          if pgrep -f "agent-usage-monitor" >/dev/null; then
+            echo "::notice title=5 verdict::The app is RUNNING after being opened like a user would."
+          else
+            echo "::error title=5 verdict::The app is NOT running after being opened. See the annotations above."
+            exit 1
+          fi

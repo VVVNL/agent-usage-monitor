@@ -5,6 +5,7 @@ pub mod activity;
 pub mod display;
 pub mod form;
 pub mod icon;
+pub mod instance;
 pub mod notify;
 pub mod view;
 pub mod widget;

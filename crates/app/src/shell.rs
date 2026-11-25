@@ -38,7 +38,6 @@ use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
 
 slint::include_modules!();
 
-const INSTANCE_NAME: &str = "AgentUsageMonitor-single-instance";
 const INTERVALS: [(u64, &str); 4] = [
     (60, "1 minute"),
     (300, "5 minutes"),
@@ -1269,18 +1268,36 @@ pub fn run() {
         // No console in release builds, so leave a readable trace.
         if let Ok(paths) = Paths::system() {
             let _ = std::fs::create_dir_all(&paths.dir);
-            let _ = std::fs::write(paths.dir.join("startup-error.txt"), msg);
+            let _ = std::fs::write(paths.dir.join("startup-error.txt"), &msg);
+        }
+        // A menu bar app has no window to show the problem in; say it once, visibly.
+        #[cfg(target_os = "macos")]
+        {
+            let _ = aum_platform::toast(
+                "Agent Usage Monitor could not start",
+                &format!("{msg}. Details: startup-error.txt in the settings folder."),
+            );
         }
     }
 }
 
 fn run_inner() -> Result<(), String> {
     // Single instance: a second launch exits quietly.
-    let instance =
-        single_instance::SingleInstance::new(INSTANCE_NAME).map_err(|e| e.to_string())?;
-    if !instance.is_single() {
-        return Ok(());
-    }
+    // If the lock cannot be created at all, carry on without it: two copies is a lesser problem
+    // than an app that does not start (that is what a bad lock path did on macOS).
+    let instance = match single_instance::SingleInstance::new(&aum_app::instance::key(
+        cfg!(target_os = "macos"),
+        &std::env::temp_dir(),
+    )) {
+        Ok(i) if !i.is_single() => return Ok(()),
+        Ok(i) => Some(i),
+        Err(e) => {
+            diag(&format!(
+                "single-instance lock unavailable, continuing: {e}"
+            ));
+            None
+        }
+    };
 
     let paths = Paths::system().map_err(|e| e.to_string())?;
     let (settings, outcome) = aum_store::load_settings(&paths);

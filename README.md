@@ -149,7 +149,12 @@ out to keep it visible). Hover for the numbers; right-click for the menu.
 
 ## macOS notes
 
-Written without access to a Mac, so treat the first macOS release as a beta to be tested:
+Written without access to a Mac, so treat the first macOS release as a beta to be tested. **0.11.0 did not
+start on a Mac**: the single-instance lock used a relative file name, which macOS resolves against `/` when
+the app is opened from Finder, so it failed with "file open or create error" and quit (found by running the
+released DMG on a macOS runner, `.github/workflows/macos-smoke.yml`). Fixed after 0.11.0 (the lock is now an
+absolute path in the temporary folder, a lock failure no longer stops the app, and a startup failure shows a
+notification). It still has not been run by a person on a real Mac beyond that smoke test:
 
 - It type-checks and passes Clippy for `aarch64-apple-darwin` and `x86_64-apple-darwin`, the text
   helpers (notification script, LaunchAgent plist) are unit-tested on every OS, and the packaging
@@ -273,7 +278,7 @@ These were deliberately deferred and must be done before 1.0:
 - [ ] **Codex against a real Codex.** Install Codex CLI, sign in with ChatGPT, run
       `aum --codex`, compare with `/status` in Codex, replace the schema-derived fixtures with real
       captures (redacted), and enable Codex in Settings.
-- [ ] **A real Mac.** Install the DMG (right-click > Open), then check: menu bar text, widget placement
+- [ ] **A real Mac.** The smoke test on a macOS runner covers launch only. Install the DMG (right-click > Open), then check: menu bar text, widget placement
       on the main and a second display, Esc/R, opacity, always-on-top, notifications, launch at login,
       `claude` found when started from Finder, Quit leaves nothing running.
 - [ ] **The shipped builds.** CI built and published v0.11.0 (`windows-msvc` installer and portable zip,

@@ -4,6 +4,12 @@ All notable changes. Versions before 1.0 are betas.
 
 ## Unreleased
 
+- **Fixed: the macOS app did not start at all.** `single-instance` treats its name as a *file path* on macOS;
+  our bare name resolved against `/` (the working directory of an app opened from Finder), which is not
+  writable, so startup failed with "file open or create error". The lock is now an absolute path in the
+  temporary folder, a lock that cannot be created no longer stops the app, and a startup failure on macOS
+  now shows a notification as well as writing `startup-error.txt`. Found with the new
+  `.github/workflows/macos-smoke.yml`, which installs a DMG on a real macOS runner and tries to start it.
 - Docs: README and website now state exactly what runs where (Windows tested, macOS beta never run on a
   Mac, Linux `aum` only) and per provider (Claude Code supported; Codex CLI experimental, off by default,
   limits only). Install guide gains a Linux section; `OWNER` placeholders replaced with the real repository.
