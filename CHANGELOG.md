@@ -5,10 +5,12 @@ All notable changes. Versions before 1.0 are betas.
 ## Unreleased
 
 - Release workflow now builds every supported platform in parallel and publishes one release: Windows
-  (installer, portable zip now also containing `aum.exe`), macOS (universal DMG, opt-in via `MACOS_CI`)
+  (installer, portable zip now also containing `aum.exe`), macOS (universal DMG)
   and a Linux x64 `aum` command-line archive. Can be run by hand as a dry run that publishes nothing.
-- CI: macOS jobs are opt-in (`MACOS_CI` repository variable), every job has a timeout, and a newer
-  push cancels the older CI run, so a macOS job waiting for a runner cannot leave a run stuck.
+- CI: every job has a timeout and a newer push cancels the older CI run. The macOS jobs run by default;
+  set the repository variable `SKIP_MACOS=true` to skip them if macOS runners are unavailable.
+- CI: GitHub Actions bumped to Node 24 releases (checkout v6, upload-artifact v6, download-artifact v7,
+  action-gh-release v3) to clear the Node 20 deprecation warnings.
 - **Compact toggle on the widget**: a chevron button next to Refresh switches between the full and
   compact widget (same setting as Widget → Compact mode in the tray menu, so the two stay in sync).
 - **Fixed: widget position after plugging in or removing a display.** Windows moves the widget by

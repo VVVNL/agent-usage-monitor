@@ -23,7 +23,7 @@ Use for every release. Tick each box in the release PR.
       every build succeeded (and creates nothing if any build failed).
 - [ ] The workflow produced: setup `.exe`, portable `.zip` (app and `aum.exe`), `SHA256SUMS.txt`;
       `aum-<version>-linux-x64.tar.gz` (command-line tool only, no Linux tray app yet) and
-      `SHA256SUMS-linux.txt`; and, if `MACOS_CI=true`, the macOS files listed below.
+      `SHA256SUMS-linux.txt`; and the macOS files listed below (unless `SKIP_MACOS=true`).
 - [ ] On a **clean Windows 10 and Windows 11** machine or VM, with Claude Code installed and signed in:
   - [ ] Installer runs without administrator rights; SmartScreen path matches INSTALL.md.
   - [ ] Tray icon, widget and tooltip show real limits within 30 seconds.
@@ -42,7 +42,7 @@ Use for every release. Tick each box in the release PR.
 
 ## macOS (while macOS support is unproven, do all of this on a real Mac)
 
-- [ ] The repository variable `MACOS_CI` is `true` (the macOS jobs are opt-in, see below), and the
+- [ ] `SKIP_MACOS` is not set (see CI notes below), and the
       release workflow produced `agent-usage-monitor-<version>-macos-universal.dmg` and
       `SHA256SUMS-macos.txt`.
 - [ ] On Apple Silicon **and** an Intel Mac (or Rosetta): right-click > Open works; menu bar item shows
@@ -71,8 +71,11 @@ Use for every release. Tick each box in the release PR.
 
 ## CI notes
 
-- The macOS CI and release jobs only run when the repository variable `MACOS_CI` is `true`
-  (Settings > Secrets and variables > Actions > Variables). They are off by default because a macOS job
-  that never gets a runner (plan or billing limits) leaves the whole run queued and hard to cancel.
+- The macOS CI and release jobs run by default. If macOS runners are unavailable on your plan, a macOS
+  job that never gets a runner leaves the whole run queued and hard to cancel (force-cancel it from the
+  run's menu or the API, `POST /repos/{owner}/{repo}/actions/runs/{id}/force-cancel`). Set the
+  repository variable `SKIP_MACOS=true` (Settings > Secrets and variables > Actions > Variables) to
+  skip them; releases then have no DMG.
+- A release is only published by pushing a tag `vX.Y.Z`. Pushing commits to `main` runs CI only.
 - Every job has a `timeout-minutes`, and `ci.yml` cancels an older run when a newer push arrives on the
   same branch. Neither helps a job still *waiting for a runner*, which only times out after 24 hours.

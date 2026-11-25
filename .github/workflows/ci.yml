@@ -23,7 +23,7 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -38,7 +38,7 @@ jobs:
     needs: lint-and-test
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --release -p aum-app --locked
@@ -48,31 +48,31 @@ jobs:
           choco install innosetup -y --no-progress
           python scripts/third_party.py
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=0.0.0-ci" "/DSourceExe=..\target\release\agent-usage-monitor.exe" installer\agent-usage-monitor.iss
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: agent-usage-monitor-windows-x64
           path: |
             target/release/agent-usage-monitor.exe
             dist/*-setup.exe
 
-  # macOS runners are opt-in: a job waiting for a runner that never arrives (billing or plan
-  # limits) keeps the whole run "queued" and cannot be cancelled normally. Turn on with the
-  # repository variable MACOS_CI=true (Settings > Secrets and variables > Actions > Variables).
+  # Runs by default. If macOS runners are unavailable on your plan, a job waiting for a runner
+  # that never arrives keeps the whole run "queued" and cannot be cancelled normally: set the
+  # repository variable SKIP_MACOS=true (Settings > Secrets and variables > Actions > Variables).
   macos-build:
     name: macOS tests and universal app bundle
-    if: ${{ vars.MACOS_CI == 'true' }}
+    if: ${{ vars.SKIP_MACOS != 'true' }}
     runs-on: macos-latest
     needs: lint-and-test
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
       - name: Build the app bundle and DMG (ad-hoc signed)
         run: scripts/macos-bundle.sh 0.0.0-ci
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: agent-usage-monitor-macos-universal
           path: |
