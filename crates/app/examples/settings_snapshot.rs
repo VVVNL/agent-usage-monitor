@@ -29,6 +29,8 @@ mod ui {
             interval_index: 4,
             interval_minutes: 7,
             launch_at_login: true,
+            update_check: false,
+            update_beta: true,
             widget_visible: true,
             on_top: true,
             compact: false,

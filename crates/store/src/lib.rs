@@ -73,6 +73,30 @@ impl NotifyConfig {
     }
 }
 
+/// Update notifications. Nothing is ever downloaded or installed by the app; at most it tells you that
+/// a newer version exists. Off until the user says yes (asked once).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct UpdateSettings {
+    /// Check GitHub for a newer version about once a day. The tray menu's "Check for updates"
+    /// works regardless: a click is the consent for that one request.
+    pub check_daily: bool,
+    /// The one-time question has been answered (either way); never ask again.
+    pub prompted: bool,
+    /// Also offer pre-release versions. On while every 0.x release is a pre-release.
+    pub include_beta: bool,
+}
+
+impl Default for UpdateSettings {
+    fn default() -> Self {
+        Self {
+            check_daily: false,
+            prompted: false,
+            include_beta: true,
+        }
+    }
+}
+
 /// Session activity (running / waiting / finished sessions) preferences.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
@@ -137,6 +161,7 @@ pub struct Settings {
     pub codex_cli_path: Option<String>,
     pub codex_notify: NotifyConfig,
     pub activity: ActivitySettings,
+    pub update: UpdateSettings,
     pub launch_at_login: bool,
 }
 
@@ -158,6 +183,7 @@ impl Default for Settings {
             codex_cli_path: None,
             codex_notify: NotifyConfig::default(),
             activity: ActivitySettings::default(),
+            update: UpdateSettings::default(),
             launch_at_login: false,
         }
     }
@@ -578,6 +604,20 @@ mod tests {
         let (s, _) = load_settings(&p);
         assert_eq!(s.claude_notify, NotifyConfig::default());
         assert!(!s.launch_at_login);
+    }
+
+    #[test]
+    fn update_checks_are_off_and_unasked_by_default_and_old_files_still_load() {
+        let (_d, p) = paths();
+        fs::create_dir_all(&p.dir).unwrap();
+        fs::write(p.settings(), r#"{"poll_interval_secs": 300}"#).unwrap();
+        let (s, _) = load_settings(&p);
+        assert!(
+            !s.update.check_daily,
+            "no network use until the user says yes"
+        );
+        assert!(!s.update.prompted, "the question is still to be asked");
+        assert!(s.update.include_beta);
     }
 
     #[test]

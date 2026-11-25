@@ -1,0 +1,25 @@
+// One-time question: may the app check GitHub for new versions? Pure presentation.
+import { Button } from "std-widgets.slint";
+
+export component UpdatePromptWindow inherits Window {
+    title: "Agent Usage Monitor";
+    preferred-width: 440px;
+    callback answered(bool);
+
+    VerticalLayout {
+        padding: 20px;
+        spacing: 12px;
+        Text { text: "Check for new versions?"; font-size: 16px; font-weight: 700; }
+        Text {
+            wrap: word-wrap;
+            font-size: 12px;
+            text: "Agent Usage Monitor can look on GitHub once a day and tell you when a newer version exists. It only checks: nothing is downloaded or installed, and no usage data leaves your computer. GitHub sees your IP address, like any web request. You can change this any time in Settings.";
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: end;
+            Button { text: "No thanks"; clicked => { root.answered(false); } }
+            Button { text: "Yes, check daily"; primary: true; clicked => { root.answered(true); } }
+        }
+    }
+}

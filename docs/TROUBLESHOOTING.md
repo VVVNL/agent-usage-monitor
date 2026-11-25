@@ -54,6 +54,19 @@ Open the settings folder from the tray menu (**Open settings folder**) to reach 
 | Notifications say "Script Editor" | Notifications are sent through `osascript` | Expected; allow them in System Settings > Notifications |
 | Widget corners are square | No rounded-corner call on macOS yet | Known limitation |
 
+## Update check
+
+- **"the repository's releases are not publicly visible (HTTP 404)"**: the project's GitHub repository is
+  private (or renamed). The check can only read public releases.
+- **"GitHub is limiting requests from this network"**: unauthenticated GitHub requests are limited per IP
+  address (60 an hour, shared by everyone behind one router). It tries again within a day; wait and retry.
+- **"curl is not available"**: the check uses the system's `curl` (Windows 10 version 1803 and later, macOS).
+  Without it the check is unavailable; look for new versions on the releases page instead.
+- **No question appeared / want it again**: the question is asked once. Use Settings > Updates, or the tray
+  menu's "Check for updates…". To be asked again, quit the app and remove `"prompted"` from the `update`
+  section of `settings.json`.
+- Every failure is written to `diagnostics.log` ("update check failed: …"); `update.json` holds the last one.
+
 ## Starting over
 
 Quit from the tray menu, delete `%APPDATA%\AgentUsageMonitor`, start the app again.

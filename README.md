@@ -42,11 +42,24 @@ this app never opens `~/.codex/auth.json`.
 - **Provenance:** the percentages and reset times are what the provider itself reports
   (**Official**). Nothing is estimated or invented. If a value is missing it is shown as unavailable.
 - **No credentials are read.** The app never opens Claude's token files or keychain entries and has
-  no network code. Claude Code does the talking.
+  no network code for usage. Claude Code does the talking. The only optional request is the update
+  check below.
 - **Read-only.** It modifies no Claude Code files. `--no-session-persistence` stops each poll from
   writing a transcript into `~/.claude/projects/` (without it, every poll would).
 - **No quota cost.** `/usage` makes no model call (zero tokens, zero cost in its own output).
 - **No telemetry, no backend, no conversation content.**
+
+## Update notifications (optional)
+
+The app can tell you when a newer version exists. It is **off until you say yes** (asked once, a few
+seconds after the first start; Settings > Updates changes it) and it **only notifies: nothing is downloaded
+or installed**. Once a day it asks GitHub for the list of releases through the system's `curl`; the tray
+menu's "Check for updates…" asks on demand. When a newer version exists the menu shows "Update available:
+X — open release page" and you get one notification. "Include beta versions" is on while every 0.x
+release is a pre-release. Details and exactly what is sent: [docs/PRIVACY.md](docs/PRIVACY.md#update-check-optional);
+design and later stages: [docs/research/auto-update.md](docs/research/auto-update.md).
+**It needs the repository to be public**: for a private repository GitHub answers "not found" and the
+check reports that it cannot see the releases.
 
 ## Session activity
 
@@ -262,6 +275,11 @@ These were deliberately deferred and must be done before 1.0:
       attribution shown at the bottom of Settings. Confirm that is acceptable for an MIT project (the
       alternatives are GPLv3 for the whole app, or a commercial licence).
 - [ ] **Code signing** (optional, removes the SmartScreen warning).
+- [ ] **Update check against this project's real releases.** Verified with a scripted runner, a real
+      response from a public repository (including the ETag "unchanged" answer) and on Windows against
+      GitHub (the private repository correctly reported as not visible). Still to do once the repository is
+      public and a release newer than the installed one exists: see "Update available" appear in the tray
+      menu, the notification, and the release page opening (also on a Mac).
 
 ## Roadmap
 

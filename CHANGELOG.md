@@ -4,6 +4,13 @@ All notable changes. Versions before 1.0 are betas.
 
 ## Unreleased
 
+- **Update notifications (stage 1 of docs/research/auto-update.md).** New `aum-update` crate and
+  Settings > Updates. Off until you say yes: the app asks once, a few seconds after the first start
+  (closing the window counts as no). Once a day, or on tray menu "Check for updates…", it lists the
+  project's GitHub releases through the system `curl` (https only, ETag, no credentials, generic
+  user agent), remembers the result in `update.json`, and shows "Update available: X" in the tray menu plus
+  one notification. Choosing it opens the release page. Nothing is downloaded or installed. Beta
+  (pre-release) versions are included by default until 1.0. Needs a public repository.
 - Release workflow now builds every supported platform in parallel and publishes one release: Windows
   (installer, portable zip now also containing `aum.exe`), macOS (universal DMG)
   and a Linux x64 `aum` command-line archive. Can be run by hand as a dry run that publishes nothing.

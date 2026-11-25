@@ -27,6 +27,7 @@ aum-core.workspace = true
 aum-providers.workspace = true
 aum-collector.workspace = true
 aum-store.workspace = true
+aum-update.workspace = true
 chrono.workspace = true
 tokio.workspace = true
 

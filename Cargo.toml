@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/core", "crates/providers", "crates/collector", "crates/store", "crates/cli", "crates/app", "crates/platform"]
+members = ["crates/update", "crates/core", "crates/providers", "crates/collector", "crates/store", "crates/cli", "crates/app", "crates/platform"]
 
 [workspace.package]
 version = "0.11.0"
@@ -14,6 +14,7 @@ aum-providers = { path = "crates/providers" }
 aum-collector = { path = "crates/collector" }
 aum-store = { path = "crates/store" }
 aum-platform = { path = "crates/platform" }
+aum-update = { path = "crates/update" }
 async-trait = "0.1"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
 chrono-tz = "0.10"

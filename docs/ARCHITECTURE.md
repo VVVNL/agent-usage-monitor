@@ -10,6 +10,8 @@ crates/
   app         tray / menu bar + widget + settings UI             (Windows + macOS shell, tested logic)
   platform    the only unsafe code, one module per OS: opacity, rounded corners, monitors,
               launch at login, notifications (Windows: Win32/registry/WinRT; macOS: AppKit/LaunchAgent/osascript)
+  update      optional "is there a newer release?" check: GitHub release list via the system `curl`,
+              version rules, throttling, remembered result (pure logic, tested; never downloads or installs)
   cli         `aum`, a headless runner
 ```
 

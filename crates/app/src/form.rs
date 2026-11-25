@@ -45,6 +45,9 @@ pub struct Form {
     /// Refresh interval in whole minutes, 1 to 1440. The dropdown and the number box both edit this.
     pub interval_minutes: i32,
     pub launch_at_login: bool,
+    /// Check GitHub for a newer version about once a day (off until the user says yes).
+    pub update_check: bool,
+    pub update_beta: bool,
     pub widget_visible: bool,
     pub on_top: bool,
     pub compact: bool,
@@ -94,6 +97,8 @@ impl Form {
             cli_path: s.claude_cli_path.clone().unwrap_or_default(),
             interval_minutes: minutes_of(s.poll_interval_secs),
             launch_at_login,
+            update_check: s.update.check_daily,
+            update_beta: s.update.include_beta,
             widget_visible: s.widget_visible,
             on_top: s.widget_always_on_top,
             compact: s.widget_compact,
@@ -132,6 +137,12 @@ impl Form {
             s.poll_interval_secs = u64::from(minutes.unsigned_abs()) * 60;
         }
         s.launch_at_login = self.launch_at_login;
+        // Touching the switch is an answer to the one-time question too.
+        if self.update_check != s.update.check_daily {
+            s.update.prompted = true;
+        }
+        s.update.check_daily = self.update_check;
+        s.update.include_beta = self.update_beta;
         s.widget_visible = self.widget_visible;
         s.widget_always_on_top = self.on_top;
         s.widget_compact = self.compact;
@@ -467,5 +478,22 @@ mod tests {
             (s.activity.alert_min_secs, s.activity.finished_minutes),
             (3600, 1)
         );
+    }
+
+    #[test]
+    fn switching_the_update_check_answers_the_one_time_question() {
+        let mut s = Settings::default();
+        assert!(!s.update.check_daily && !s.update.prompted);
+        let mut f = Form::from_settings(&s, false);
+        f.update_beta = false;
+        f.apply_to(&mut s);
+        assert!(
+            !s.update.prompted,
+            "changing only the beta box is not an answer"
+        );
+        assert!(!s.update.include_beta);
+        f.update_check = true;
+        f.apply_to(&mut s);
+        assert!(s.update.check_daily && s.update.prompted);
     }
 }

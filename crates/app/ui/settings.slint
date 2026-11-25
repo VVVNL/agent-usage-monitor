@@ -7,6 +7,8 @@ export struct SettingsForm {
     interval-index: int,
     interval-minutes: int,
     launch-at-login: bool,
+    update-check: bool,
+    update-beta: bool,
     widget-visible: bool,
     on-top: bool,
     compact: bool,
@@ -194,6 +196,21 @@ export component SettingsWindow inherits Window {
                     text: "Launch at login";
                     checked: root.form.launch-at-login;
                     toggled => { root.form.launch-at-login = self.checked; root.changed(root.form); }
+                }
+            }
+
+            Section {
+                heading: "Updates";
+                Switch {
+                    text: "Check for new versions once a day";
+                    checked: root.form.update-check;
+                    toggled => { root.form.update-check = self.checked; root.changed(root.form); }
+                }
+                Text { text: "Asks GitHub (api.github.com) whether a newer release exists. It only tells you: nothing is downloaded or installed, and no usage data is sent. Off by default; the tray menu's \"Check for updates\" works either way."; font-size: 11px; height: 76px; wrap: word-wrap; opacity: 0.7; }
+                Switch {
+                    text: "Include beta (pre-release) versions";
+                    checked: root.form.update-beta;
+                    toggled => { root.form.update-beta = self.checked; root.changed(root.form); }
                 }
             }
 

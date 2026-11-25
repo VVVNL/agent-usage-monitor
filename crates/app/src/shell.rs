@@ -22,7 +22,9 @@ use aum_core::{Provider, ProviderState};
 use aum_providers::claude::ClaudeProvider;
 use aum_providers::claude::activity::{ClaudeActivity, WslConfig};
 use aum_providers::codex::CodexProvider;
+use aum_providers::runner::SystemRunner;
 use aum_store::{LoadOutcome, Paths, Settings, Theme, WidgetPos};
+use aum_update::{UpdateState, Version};
 use chrono::Utc;
 #[cfg(windows)]
 use slint::winit_030::winit::platform::windows::WindowExtWindows;
@@ -180,6 +182,8 @@ struct MenuState {
     intervals: Vec<(u64, CheckMenuItem)>,
     /// "Custom…" entry: checked, and labelled with the value, when the interval is not a preset.
     custom_interval: CheckMenuItem,
+    /// "Check for updates…", or "Update available: …" once one is known.
+    update_item: MenuItem,
     show: CheckMenuItem,
     on_top: CheckMenuItem,
     compact: CheckMenuItem,
@@ -215,6 +219,33 @@ impl MenuState {
     }
 }
 
+/// Text and enabled state of the tray's update entry.
+fn update_menu_text(state: &UpdateState, s: &Settings, busy: bool) -> (String, bool) {
+    if busy {
+        return ("Checking for updates…".to_owned(), false);
+    }
+    match state.available(&current_version(), s.update.include_beta) {
+        Some(a) => (
+            format!("Update available: {} — open release page", a.version),
+            true,
+        ),
+        None => ("Check for updates…".to_owned(), true),
+    }
+}
+
+fn current_version() -> Version {
+    Version::parse(env!("CARGO_PKG_VERSION")).expect("the crate version is a version")
+}
+
+/// Open a web page in the default browser. Only ever called with a URL we built ourselves.
+fn open_url(url: &str) {
+    #[cfg(windows)]
+    let opener = "explorer.exe";
+    #[cfg(target_os = "macos")]
+    let opener = "open";
+    let _ = std::process::Command::new(opener).arg(url).spawn();
+}
+
 fn flatten(model: &view::TrayModel, notice: Option<&str>) -> Vec<String> {
     let mut out = Vec::new();
     if let Some(n) = notice {
@@ -239,6 +270,7 @@ fn build_menu(
     model: &view::TrayModel,
     notice: Option<&str>,
     settings: &Settings,
+    update: &(String, bool),
 ) -> (Menu, MenuState) {
     let menu = Menu::new();
     let mut lines = Vec::new();
@@ -301,6 +333,8 @@ fn build_menu(
         true,
         None,
     ));
+    let update_item = MenuItem::with_id("update", &update.0, update.1, None);
+    let _ = menu.append(&update_item);
     let _ = menu.append(&PredefinedMenuItem::separator());
     let _ = menu.append(&MenuItem::with_id("quit", "Quit", true, None));
 
@@ -309,6 +343,7 @@ fn build_menu(
         lines,
         intervals,
         custom_interval,
+        update_item,
         show,
         on_top,
         compact,
@@ -391,6 +426,8 @@ fn to_slint_form(f: &Form) -> SettingsForm {
         interval_index: form::preset_index(f.interval_minutes),
         interval_minutes: f.interval_minutes,
         launch_at_login: f.launch_at_login,
+        update_check: f.update_check,
+        update_beta: f.update_beta,
         widget_visible: f.widget_visible,
         on_top: f.on_top,
         compact: f.compact,
@@ -421,6 +458,8 @@ fn from_slint_form(f: &SettingsForm) -> Form {
         cli_path: f.cli_path.to_string(),
         interval_minutes: f.interval_minutes,
         launch_at_login: f.launch_at_login,
+        update_check: f.update_check,
+        update_beta: f.update_beta,
         widget_visible: f.widget_visible,
         on_top: f.on_top,
         compact: f.compact,
@@ -461,6 +500,15 @@ struct App {
     settle: Timer,
     /// Watches the monitor layout while the widget is visible (see `DISPLAY_POLL`).
     display_poll: Timer,
+    /// What the update check remembers (`update.json`); nothing is downloaded or installed.
+    update: UpdateState,
+    update_busy: bool,
+    /// Hourly "is the daily check due?" timer, and the one-shot first check after start.
+    update_timer: Timer,
+    update_first: Timer,
+    /// Fires once after start to ask the one-time update question.
+    prompt_timer: Timer,
+    prompt_win: Option<UpdatePromptWindow>,
     /// Last monitor layout seen; lets us tell display changes from the user dragging the widget.
     layout: Rc<RefCell<LayoutWatch>>,
     notifier: notify::Engine,
@@ -601,7 +649,9 @@ impl App {
                     }
                 }
             } else {
-                let (menu, state) = build_menu(&model, self.notice.as_deref(), &self.settings);
+                let update = update_menu_text(&self.update, &self.settings, self.update_busy);
+                let (menu, state) =
+                    build_menu(&model, self.notice.as_deref(), &self.settings, &update);
                 tray.set_menu(Some(Box::new(menu)));
                 self.menu = Some(state);
             }
@@ -921,6 +971,12 @@ impl App {
             }
         }
         self.save_settings();
+        if self.settings.update.check_daily != old.update.check_daily {
+            self.schedule_update_checks(self.settings.update.check_daily);
+        }
+        if self.settings.update.include_beta != old.update.include_beta {
+            self.refresh_update_menu();
+        }
 
         let s = &self.settings;
         if s.claude_enabled != old.claude_enabled
@@ -959,8 +1015,172 @@ impl App {
         self.render();
     }
 
+    // ----- update notifications (see docs/research/auto-update.md) -----
+
+    fn refresh_update_menu(&self) {
+        if let Some(m) = &self.menu {
+            let (text, enabled) = update_menu_text(&self.update, &self.settings, self.update_busy);
+            m.update_item.set_text(text);
+            m.update_item.set_enabled(enabled);
+        }
+    }
+
+    /// (Re)arm the automatic check: an hourly "is it due?" tick plus one first check shortly after
+    /// start (spread over a few minutes so many installs do not ask at the same second).
+    fn schedule_update_checks(&mut self, soon: bool) {
+        self.update_timer.stop();
+        self.update_first.stop();
+        if !self.settings.update.check_daily {
+            return;
+        }
+        self.update_timer
+            .start(TimerMode::Repeated, Duration::from_secs(3600), || {
+                with_app(App::auto_update_tick)
+            });
+        let jitter = u64::from(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.subsec_nanos())
+                % 240,
+        );
+        let delay = if soon { 3 } else { 60 + jitter };
+        self.update_first
+            .start(TimerMode::SingleShot, Duration::from_secs(delay), || {
+                with_app(App::auto_update_tick)
+            });
+    }
+
+    fn auto_update_tick(&mut self) {
+        if self.settings.update.check_daily && self.update.is_due(Utc::now()) {
+            self.start_update_check(false);
+        }
+    }
+
+    /// `manual`: the user asked (always answered with a notification). Automatic checks only ever
+    /// notify about a version they have not announced before.
+    fn start_update_check(&mut self, manual: bool) {
+        if self.update_busy {
+            return;
+        }
+        let now = Utc::now();
+        let include_beta = self.settings.update.include_beta;
+        if manual && !self.update.manual_check_allowed(now) {
+            // Asked a moment ago: answer from memory instead of sending another request.
+            let report = aum_update::Report {
+                available: self.update.available(&current_version(), include_beta),
+                error: self.update.last_error.clone(),
+            };
+            self.tell_update_result(&report);
+            return;
+        }
+        self.update_busy = true;
+        self.refresh_update_menu();
+        let mut state = self.update.clone();
+        self.rt.spawn(async move {
+            let report = aum_update::check(
+                &SystemRunner,
+                &aum_update::fetch::curl_path(),
+                &mut state,
+                &current_version(),
+                include_beta,
+                Utc::now(),
+            )
+            .await;
+            let _ = slint::invoke_from_event_loop(move || {
+                with_app(|a| a.update_done(state, &report, manual));
+            });
+        });
+    }
+
+    fn update_done(&mut self, state: UpdateState, report: &aum_update::Report, manual: bool) {
+        self.update = state;
+        self.update_busy = false;
+        if let Some(e) = &report.error {
+            diag(&format!("update check failed: {e}"));
+        }
+        let announce = match &report.available {
+            Some(a) => manual || self.update.announced.as_deref() != Some(a.tag.as_str()),
+            None => manual,
+        };
+        if let Some(a) = &report.available
+            && announce
+        {
+            self.update.announced = Some(a.tag.clone());
+        }
+        self.update.save(&self.paths);
+        self.refresh_update_menu();
+        if announce {
+            self.tell_update_result(report);
+        }
+    }
+
+    fn tell_update_result(&self, report: &aum_update::Report) {
+        let msg = match (&report.available, &report.error) {
+            (Some(a), _) => format!(
+                "Version {} is available. Choose \"Update available\" in the tray menu to open its page.",
+                a.version
+            ),
+            (None, Some(e)) => format!("Couldn't check for updates: {e}."),
+            (None, None) => format!("You're up to date (version {}).", current_version()),
+        };
+        std::thread::spawn(move || {
+            if let Err(e) = aum_platform::toast("Agent Usage Monitor", &msg) {
+                diag(&format!("update toast failed: {e}"));
+            }
+        });
+    }
+
+    fn open_update_page(&self) {
+        let found = self
+            .update
+            .available(&current_version(), self.settings.update.include_beta);
+        if let Some(url) = found.and_then(|a| aum_update::release_page(&a.tag)) {
+            open_url(&url);
+        }
+    }
+
+    /// The one-time question. Closing the window counts as "no": it is asked once, never nagged.
+    fn maybe_prompt_for_updates(&mut self) {
+        if self.settings.update.prompted || self.prompt_win.is_some() {
+            return;
+        }
+        let Ok(win) = UpdatePromptWindow::new() else {
+            return;
+        };
+        win.on_answered(|yes| with_app(|a| a.answer_update_prompt(yes)));
+        win.window().on_close_requested(|| {
+            let _ = slint::invoke_from_event_loop(|| with_app(|a| a.answer_update_prompt(false)));
+            slint::CloseRequestResponse::HideWindow
+        });
+        let _ = win.show();
+        self.prompt_win = Some(win);
+    }
+
+    fn answer_update_prompt(&mut self, yes: bool) {
+        let Some(win) = self.prompt_win.take() else {
+            return; // already answered (the close handler runs after a button too)
+        };
+        let _ = win.hide();
+        self.settings.update.prompted = true;
+        self.settings.update.check_daily = yes;
+        self.save_settings();
+        self.refresh_settings_form();
+        self.schedule_update_checks(yes);
+    }
+
     fn on_menu(&mut self, id: &str) {
         match id {
+            "update" => {
+                if self
+                    .update
+                    .available(&current_version(), self.settings.update.include_beta)
+                    .is_some()
+                {
+                    self.open_update_page();
+                } else {
+                    self.start_update_check(true);
+                }
+            }
             "refresh" => self.refresh(),
             "settings" | "interval:custom" => self.open_settings(),
             "open_dir" => {
@@ -1181,7 +1401,9 @@ fn run_inner() -> Result<(), String> {
         Utc::now(),
         settings.poll_interval(),
     );
-    let (menu, menu_state) = build_menu(&model, notice.as_deref(), &settings);
+    let update_state = UpdateState::load(&paths);
+    let update_ui = update_menu_text(&update_state, &settings, false);
+    let (menu, menu_state) = build_menu(&model, notice.as_deref(), &settings, &update_ui);
     let tray = TrayIconBuilder::new()
         .with_menu(Box::new(menu))
         .with_tooltip(&model.tooltip)
@@ -1214,6 +1436,12 @@ fn run_inner() -> Result<(), String> {
         retry: Timer::default(),
         settle: Timer::default(),
         display_poll: Timer::default(),
+        update: update_state,
+        update_busy: false,
+        update_timer: Timer::default(),
+        update_first: Timer::default(),
+        prompt_timer: Timer::default(),
+        prompt_win: None,
         layout,
         notifier,
         settings_win: None,
@@ -1225,6 +1453,16 @@ fn run_inner() -> Result<(), String> {
     if show_at_start {
         let _ = slint::invoke_from_event_loop(|| with_app(|a| a.show_widget()));
     }
+    let _ = slint::invoke_from_event_loop(|| {
+        with_app(|a| {
+            a.schedule_update_checks(false);
+            // Ask the one-time question a little after start, not in the middle of the first paint.
+            a.prompt_timer
+                .start(TimerMode::SingleShot, Duration::from_secs(20), || {
+                    with_app(App::maybe_prompt_for_updates)
+                });
+        })
+    });
 
     slint::run_event_loop_until_quit().map_err(|e| e.to_string())?;
 
