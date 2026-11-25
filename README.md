@@ -59,8 +59,7 @@ menu's "Check for updates…" asks on demand. When a newer version exists the me
 X — open release page" and you get one notification. "Include beta versions" is on while every 0.x
 release is a pre-release. Details and exactly what is sent: [docs/PRIVACY.md](docs/PRIVACY.md#update-check-optional);
 design and later stages: [docs/research/auto-update.md](docs/research/auto-update.md).
-**It needs the repository to be public**: for a private repository GitHub answers "not found" and the
-check reports that it cannot see the releases.
+The check can only read public releases (a private fork would get "not found" and the check says so).
 
 ## Session activity
 
@@ -276,11 +275,11 @@ These were deliberately deferred and must be done before 1.0:
       attribution shown at the bottom of Settings. Confirm that is acceptable for an MIT project (the
       alternatives are GPLv3 for the whole app, or a commercial licence).
 - [ ] **Code signing** (optional, removes the SmartScreen warning).
-- [ ] **Update check against this project's real releases.** Verified with a scripted runner, a real
-      response from a public repository (including the ETag "unchanged" answer) and on Windows against
-      GitHub (the private repository correctly reported as not visible). Still to do once the repository is
-      public and a release newer than the installed one exists: see "Update available" appear in the tray
-      menu, the notification, and the release page opening (also on a Mac).
+- [ ] **Update check: what the user sees.** Verified: the request, answer parser and decision against this
+      project's real public release list (v0.11.0, including the ETag "unchanged" answer), the one-time
+      question and its answers on Windows, and the failure path. Still to do when a release newer than the
+      installed one exists: see "Update available: X" in the tray menu, the notification, and the release
+      page opening (also on a Mac). `cargo test -p aum-update -- --ignored` repeats the live checks.
 
 ## Roadmap
 

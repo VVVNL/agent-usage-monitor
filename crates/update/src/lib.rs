@@ -250,4 +250,28 @@ mod tests {
         println!("second request with the ETag: {second:?}");
         assert_eq!(second, Ok(fetch::Fetched::NotModified));
     }
+
+    /// Needs the network: the same check the app performs, against this project's real releases.
+    #[tokio::test]
+    #[ignore = "uses the network"]
+    async fn live_project_repository() {
+        use aum_providers::runner::SystemRunner;
+        let curl = fetch::curl_path();
+        let mut state = UpdateState::default();
+        let older = Version::parse("0.10.0").unwrap();
+        let r = check(&SystemRunner, &curl, &mut state, &older, true, now()).await;
+        println!("running 0.10.0: {r:?}");
+        assert_eq!(r.error, None);
+        assert_eq!(r.available.expect("an update from 0.10.0").tag, "v0.11.0");
+        // Second request with the stored ETag, as the next day's check would do.
+        let r = check(&SystemRunner, &curl, &mut state, &cur(), true, now()).await;
+        println!("running 0.11.0 (ETag kept): {r:?}");
+        assert_eq!(
+            r,
+            Report {
+                available: None,
+                error: None
+            }
+        );
+    }
 }

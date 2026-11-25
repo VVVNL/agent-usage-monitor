@@ -92,6 +92,26 @@ mod tests {
 
     const LIST: &str = include_str!("../../../tests/fixtures/github/releases_list.json");
 
+    /// A real answer from this project's own repository (v0.11.0), release notes and author removed.
+    const REAL: &str = include_str!("../../../tests/fixtures/github/releases_real_v0_11_0.json");
+
+    #[test]
+    fn real_github_answer_parses_and_drives_the_decision() {
+        let seen = parse_releases(REAL).unwrap();
+        assert_eq!(
+            seen,
+            vec![SeenRelease {
+                tag: "v0.11.0".into(),
+                prerelease: true
+            }]
+        );
+        // Running 0.10.0: 0.11.0 is offered, but only when pre-releases are included.
+        assert_eq!(newest(&seen, &cur("0.10.0"), true).unwrap().tag, "v0.11.0");
+        assert!(newest(&seen, &cur("0.10.0"), false).is_none());
+        // Running 0.11.0 (the real current version): up to date.
+        assert!(newest(&seen, &cur("0.11.0"), true).is_none());
+    }
+
     fn cur(s: &str) -> Version {
         Version::parse(s).unwrap()
     }
