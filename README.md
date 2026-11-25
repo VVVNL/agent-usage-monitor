@@ -5,7 +5,7 @@ subscription limits you have used (session, weekly and any model-specific limit)
 which Claude Code sessions are working right now, with alerts before you run out. **Codex CLI** limits are
 supported experimentally.
 
-**Status: 0.11.0 beta.** Download from [GitHub Releases](https://github.com/VVVNL/agent-usage-monitor/releases).
+**Status: 0.11.1 beta.** Download from [GitHub Releases](https://github.com/VVVNL/agent-usage-monitor/releases).
 Website: <https://vvvnl.github.io/agent-usage-monitor/>.
 
 ### Platforms
@@ -152,7 +152,7 @@ out to keep it visible). Hover for the numbers; right-click for the menu.
 Written without access to a Mac, so treat the first macOS release as a beta to be tested. **0.11.0 did not
 start on a Mac**: the single-instance lock used a relative file name, which macOS resolves against `/` when
 the app is opened from Finder, so it failed with "file open or create error" and quit (found by running the
-released DMG on a macOS runner, `.github/workflows/macos-smoke.yml`). Fixed after 0.11.0 (the lock is now an
+released DMG on a macOS runner, `.github/workflows/macos-smoke.yml`). Fixed in 0.11.1 (the lock is now an
 absolute path in the temporary folder, a lock failure no longer stops the app, and a startup failure shows a
 notification). It still has not been run by a person on a real Mac beyond that smoke test:
 
@@ -305,7 +305,7 @@ These were deliberately deferred and must be done before 1.0:
 | 0.2 | Floating widget |
 | 0.9 | Settings, alerts, launch at login, installer, documentation |
 | 0.10 | Codex CLI provider, macOS support (both unproven on real hardware/software) |
-| **0.11 (this)** | Session activity (working / needs input / finished) with the WSL bridge, Claude Code only; release builds for Windows, macOS and Linux (`aum`); optional update notifications; website |
+| **0.11 (this, 0.11.1)** | Session activity (working / needs input / finished) with the WSL bridge, Claude Code only; release builds for Windows, macOS and Linux (`aum`); optional update notifications; website |
 | 1.0 | After the pending verification above |
 | later | Code signing, Codex session activity (through Codex hooks), a Linux tray app |
 

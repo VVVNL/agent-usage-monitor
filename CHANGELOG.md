@@ -2,7 +2,7 @@
 
 All notable changes. Versions before 1.0 are betas.
 
-## Unreleased
+## 0.11.1 (beta)
 
 - **Fixed: the macOS app did not start at all.** `single-instance` treats its name as a *file path* on macOS;
   our bare name resolved against `/` (the working directory of an app opened from Finder), which is not

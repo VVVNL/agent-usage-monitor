@@ -51,7 +51,7 @@ To see what a failing start says, run the app from Terminal:
 | What you see | Why | What to do |
 |---|---|---|
 | "cannot be opened because the developer cannot be verified" | The app is not notarized | Right-click the app > Open > Open (once). On recent macOS versions that choice may be missing: try to open it once, then System Settings > Privacy & Security > **Open Anyway** |
-| It does not start, no window, no icon (**0.11.0**) | Fixed after 0.11.0. The single-instance lock used a relative file name, which resolved to `/` when started from Finder and failed with "file open or create error" | Use a newer release. The reason is also in `~/Library/Application Support/AgentUsageMonitor/startup-error.txt`; newer builds also show it as a notification |
+| It does not start, no window, no icon (**0.11.0**) | Fixed in 0.11.1. The single-instance lock used a relative file name, which resolved to `/` when started from Finder and failed with "file open or create error" | Install 0.11.1 or newer. The reason is also in `~/Library/Application Support/AgentUsageMonitor/startup-error.txt`; newer builds also show it as a notification |
 | No menu bar item | Hidden behind the notch or by a menu bar manager | Make room, or use a tool that shows overflow items |
 | **CLI not found** though `claude` works in Terminal | Finder-launched apps do not get your shell `PATH` | Set the path in Settings (`which claude` shows it) |
 | Keychain prompt on first refresh | Claude Code reads its own login from the Keychain | Choose **Always Allow** for `claude` |
