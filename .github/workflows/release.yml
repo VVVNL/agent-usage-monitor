@@ -1,13 +1,31 @@
 name: Release
+
+# Builds every supported platform and publishes one GitHub release:
+#   Windows  tray app: installer + portable zip (also contains the `aum` command-line tool)
+#   macOS    tray app: universal (Apple Silicon + Intel) DMG   [opt-in, see below]
+#   Linux    `aum` command-line tool only (there is no Linux tray app yet)
+#
+# Push a tag `vX.Y.Z` that matches the version in Cargo.toml. To try the builds without
+# publishing, run this workflow by hand (Actions > Release > Run workflow): it uploads the files
+# as workflow artifacts and creates no release.
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
   windows:
+    name: Windows (app, installer, portable zip)
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
@@ -15,15 +33,19 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
-      - name: Tag must match the crate version
-        shell: pwsh
+      - name: Resolve version (tag must match the crate version)
+        id: ver
+        shell: bash
         run: |
-          $tag = "${{ github.ref_name }}".TrimStart("v")
-          $ver = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"' | Select-Object -First 1).Matches[0].Groups[1].Value
-          if ($tag -ne $ver) { throw "Tag $tag does not match Cargo.toml version $ver" }
+          ver="$(grep -m1 '^version = ' Cargo.toml | sed 's/version = "\(.*\)"/\1/')"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            tag="${GITHUB_REF_NAME#v}"
+            [ "$tag" = "$ver" ] || { echo "Tag $tag does not match Cargo.toml version $ver"; exit 1; }
+          fi
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
 
       - run: cargo test --workspace --locked
-      - run: cargo build --release -p aum-app --locked
+      - run: cargo build --release -p aum-app -p aum-cli --locked
 
       - name: Regenerate the third-party licence list
         run: python scripts/third_party.py
@@ -31,12 +53,12 @@ jobs:
       - name: Package (unsigned)
         shell: pwsh
         run: |
-          $v = "${{ github.ref_name }}".TrimStart("v")
+          $v = "${{ steps.ver.outputs.version }}"
           New-Item -ItemType Directory -Force dist | Out-Null
           # Portable zip
           $stage = "dist/agent-usage-monitor-$v-windows-x64"
           New-Item -ItemType Directory -Force $stage | Out-Null
-          Copy-Item target/release/agent-usage-monitor.exe, LICENSE, README.md, docs/THIRD_PARTY.md $stage
+          Copy-Item target/release/agent-usage-monitor.exe, target/release/aum.exe, LICENSE, README.md, docs/THIRD_PARTY.md $stage
           Compress-Archive -Path "$stage/*" -DestinationPath "dist/agent-usage-monitor-$v-windows-x64-portable.zip"
           Remove-Item -Recurse -Force $stage
           # Installer
@@ -49,14 +71,17 @@ jobs:
           } | Set-Content SHA256SUMS.txt
           Pop-Location
 
-      - uses: softprops/action-gh-release@v2
+      - uses: actions/upload-artifact@v4
         with:
-          files: dist/*
-          generate_release_notes: true
-          prerelease: ${{ contains(github.ref_name, '-') || startsWith(github.ref_name, 'v0.') }}
+          name: dist-windows
+          path: dist/*
+          if-no-files-found: error
 
-  # Opt-in, see ci.yml: set the repository variable MACOS_CI=true to also build the DMG.
+  # macOS runners are opt-in: a job waiting for a runner that never arrives (plan or billing
+  # limits) cannot be cancelled normally. Set the repository variable MACOS_CI=true
+  # (Settings > Secrets and variables > Actions > Variables) to build the DMG too.
   macos:
+    name: macOS (universal DMG)
     if: ${{ vars.MACOS_CI == 'true' }}
     runs-on: macos-latest
     timeout-minutes: 60
@@ -65,11 +90,14 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
-      - name: Tag must match the crate version
+      - name: Check the version (tag must match the crate version)
         run: |
-          tag="${GITHUB_REF_NAME#v}"
           ver="$(grep -m1 '^version = ' Cargo.toml | sed 's/version = "\(.*\)"/\1/')"
-          [ "$tag" = "$ver" ] || { echo "Tag $tag does not match Cargo.toml version $ver"; exit 1; }
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            tag="${GITHUB_REF_NAME#v}"
+            [ "$tag" = "$ver" ] || { echo "Tag $tag does not match Cargo.toml version $ver"; exit 1; }
+          fi
+          echo "VERSION=$ver" >> "$GITHUB_ENV"
 
       - run: cargo test --workspace --locked
       - run: python3 scripts/third_party.py
@@ -81,12 +109,71 @@ jobs:
           NOTARY_APPLE_ID: ${{ secrets.MACOS_NOTARY_APPLE_ID }}
           NOTARY_TEAM_ID: ${{ secrets.MACOS_NOTARY_TEAM_ID }}
           NOTARY_PASSWORD: ${{ secrets.MACOS_NOTARY_PASSWORD }}
-        run: scripts/macos-bundle.sh "${GITHUB_REF_NAME#v}"
+        run: scripts/macos-bundle.sh "$VERSION"
 
-      - uses: softprops/action-gh-release@v2
+      - uses: actions/upload-artifact@v4
         with:
-          files: |
+          name: dist-macos
+          path: |
             dist/*.dmg
             dist/SHA256SUMS-macos.txt
+          if-no-files-found: error
+
+  linux-cli:
+    name: Linux (aum command-line tool)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check the version (tag must match the crate version)
+        run: |
+          ver="$(grep -m1 '^version = ' Cargo.toml | sed 's/version = "\(.*\)"/\1/')"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            tag="${GITHUB_REF_NAME#v}"
+            [ "$tag" = "$ver" ] || { echo "Tag $tag does not match Cargo.toml version $ver"; exit 1; }
+          fi
+          echo "VERSION=$ver" >> "$GITHUB_ENV"
+
+      - run: cargo test --workspace --locked
+      - run: cargo build --release -p aum-cli --locked
+
+      - name: Package
+        run: |
+          stage="aum-$VERSION-linux-x64"
+          mkdir -p "dist/$stage"
+          cp target/release/aum LICENSE README.md "dist/$stage/"
+          tar -C dist -czf "dist/$stage.tar.gz" "$stage"
+          rm -rf "dist/$stage"
+          (cd dist && sha256sum "$stage.tar.gz" > SHA256SUMS-linux.txt)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-linux
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub release
+    # Only for tags. Needs Windows and Linux; macOS is optional (skipped unless MACOS_CI=true),
+    # but if it ran and failed, nothing is published.
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && !cancelled() && needs.windows.result == 'success' && needs.linux-cli.result == 'success' && (needs.macos.result == 'success' || needs.macos.result == 'skipped') }}
+    needs: [windows, macos, linux-cli]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          path: dist
+          merge-multiple: true
+      - run: ls -l dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') || startsWith(github.ref_name, 'v0.') }}

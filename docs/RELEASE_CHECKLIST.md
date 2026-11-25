@@ -16,8 +16,14 @@ Use for every release. Tick each box in the release PR.
 
 ## Build and test the artifacts
 
+- [ ] Optional dry run: Actions > Release > Run workflow. It builds everything and keeps the files as
+      workflow artifacts without creating a release.
 - [ ] Push the tag `vX.Y.Z` (the release workflow refuses a tag that differs from `Cargo.toml`).
-- [ ] The workflow produced: setup `.exe`, portable `.zip`, `SHA256SUMS.txt`.
+      One workflow builds all platforms in parallel; a single `publish` job creates the release once
+      every build succeeded (and creates nothing if any build failed).
+- [ ] The workflow produced: setup `.exe`, portable `.zip` (app and `aum.exe`), `SHA256SUMS.txt`;
+      `aum-<version>-linux-x64.tar.gz` (command-line tool only, no Linux tray app yet) and
+      `SHA256SUMS-linux.txt`; and, if `MACOS_CI=true`, the macOS files listed below.
 - [ ] On a **clean Windows 10 and Windows 11** machine or VM, with Claude Code installed and signed in:
   - [ ] Installer runs without administrator rights; SmartScreen path matches INSTALL.md.
   - [ ] Tray icon, widget and tooltip show real limits within 30 seconds.

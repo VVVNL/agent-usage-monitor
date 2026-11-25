@@ -4,6 +4,9 @@ All notable changes. Versions before 1.0 are betas.
 
 ## Unreleased
 
+- Release workflow now builds every supported platform in parallel and publishes one release: Windows
+  (installer, portable zip now also containing `aum.exe`), macOS (universal DMG, opt-in via `MACOS_CI`)
+  and a Linux x64 `aum` command-line archive. Can be run by hand as a dry run that publishes nothing.
 - CI: macOS jobs are opt-in (`MACOS_CI` repository variable), every job has a timeout, and a newer
   push cancels the older CI run, so a macOS job waiting for a runner cannot leave a run stuck.
 - **Compact toggle on the widget**: a chevron button next to Refresh switches between the full and
