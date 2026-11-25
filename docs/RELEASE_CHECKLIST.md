@@ -95,5 +95,7 @@ publishes it to GitHub Pages whenever `site/**` changes on `main`.
   notes (SmartScreen warning disappears once builds are signed), and the widget illustration still looks like
   the real widget.
 - **Preview locally:** open `site/index.html` in a browser; nothing else is needed.
+- The page is written for users, not as a copy of the README: what the widget shows (annotated picture),
+  how to start, and one paragraph on privacy. Keep technical detail in the README and `docs/`.
 - The widget on the page is an HTML/CSS illustration with example numbers, not a screenshot. Replace it with
   real screenshots only if they contain no personal data.
