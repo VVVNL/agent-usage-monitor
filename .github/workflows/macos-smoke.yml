@@ -1,0 +1,120 @@
+name: macOS smoke test
+
+# Downloads a published macOS DMG, installs the app the way a user would and tries to start it on a
+# real macOS runner. The findings are written as workflow annotations (readable on the run page and
+# through the API without logging in). Runs when this file changes, or by hand
+# (Actions > macOS smoke test > Run workflow) with a release tag.
+on:
+  push:
+    paths:
+      - ".github/workflows/macos-smoke.yml"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag whose DMG to test"
+        default: "v0.11.0"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    env:
+      TAG: ${{ inputs.tag || 'v0.11.0' }}
+      APP_NAME: Agent Usage Monitor
+    steps:
+      - name: Helper for annotations
+        run: |
+          cat > "$RUNNER_TEMP/annot.sh" <<'SH'
+          # usage: annot <title> <file>   (newlines and % must be escaped in workflow commands)
+          annot() {
+            local msg
+            msg="$(head -c 20000 "$2" | python3 -c 'import sys; t=sys.stdin.read(); print(t.replace("%","%25").replace("\r","%0D").replace("\n","%0A"), end="")')"
+            echo "::notice title=$1::$msg"
+          }
+          SH
+
+      - name: Download and install the DMG
+        run: |
+          set -x
+          V="${TAG#v}"
+          curl -fsSL -o "$RUNNER_TEMP/app.dmg" "https://github.com/VVVNL/agent-usage-monitor/releases/download/$TAG/agent-usage-monitor-$V-macos-universal.dmg"
+          hdiutil attach -nobrowse -readonly -mountpoint "$RUNNER_TEMP/mnt" "$RUNNER_TEMP/app.dmg"
+          mkdir -p "$HOME/Applications-test"
+          cp -R "$RUNNER_TEMP/mnt/$APP_NAME.app" "$HOME/Applications-test/"
+          hdiutil detach "$RUNNER_TEMP/mnt" || true
+
+      - name: Inspect the bundle
+        run: |
+          . "$RUNNER_TEMP/annot.sh"
+          APP="$HOME/Applications-test/$APP_NAME.app"
+          BIN="$APP/Contents/MacOS/agent-usage-monitor"
+          {
+            echo "== runner"; sw_vers; uname -m
+            echo "== layout"; ls -la "$APP/Contents" "$APP/Contents/MacOS"
+            echo "== lipo"; lipo -info "$BIN" 2>&1
+            echo "== file"; file "$BIN"
+            echo "== otool -L (first arch)"; otool -L "$BIN" 2>&1 | head -30
+            echo "== min OS / build version"; otool -l "$BIN" 2>&1 | grep -A4 -E "LC_BUILD_VERSION|LC_VERSION_MIN" | head -20
+            echo "== Info.plist"; plutil -lint "$APP/Contents/Info.plist" 2>&1; plutil -p "$APP/Contents/Info.plist" 2>&1
+            echo "== codesign -dvvv"; codesign -dvvv "$APP" 2>&1
+            echo "== codesign --verify"; codesign --verify --deep --strict --verbose=2 "$APP" 2>&1
+            echo "== spctl assess"; spctl -a -vv "$APP" 2>&1
+            echo "== quarantine attr"; xattr -l "$APP" 2>&1
+          } > "$RUNNER_TEMP/inspect.txt" 2>&1
+          cat "$RUNNER_TEMP/inspect.txt"
+          annot "1 bundle inspection" "$RUNNER_TEMP/inspect.txt"
+
+      - name: Start the binary directly
+        run: |
+          . "$RUNNER_TEMP/annot.sh"
+          BIN="$HOME/Applications-test/$APP_NAME.app/Contents/MacOS/agent-usage-monitor"
+          {
+            "$BIN" > "$RUNNER_TEMP/direct.out" 2>&1 &
+            PID=$!
+            sleep 12
+            if kill -0 "$PID" 2>/dev/null; then echo "RESULT: still running after 12 s (pid $PID)"; else wait "$PID"; echo "RESULT: EXITED early with code $?"; fi
+            echo "== stdout/stderr"; head -c 6000 "$RUNNER_TEMP/direct.out"
+            echo "== startup-error.txt"; find "$HOME/Library/Application Support" -name startup-error.txt -exec sh -c 'echo "{}"; cat "{}"' \; 2>&1
+            echo "== diagnostics.log"; find "$HOME/Library/Application Support" -name diagnostics.log -exec sh -c 'echo "{}"; tail -20 "{}"' \; 2>&1
+            echo "== settings dir"; ls -laR "$HOME/Library/Application Support/AgentUsageMonitor" 2>&1 | head -30
+            echo "== process list"; ps aux | grep -i "[a]gent-usage-monitor"
+            echo "== crash reports"; ls -la "$HOME/Library/Logs/DiagnosticReports" 2>&1 | head
+            kill "$PID" 2>/dev/null || true
+          } > "$RUNNER_TEMP/direct.txt" 2>&1
+          cat "$RUNNER_TEMP/direct.txt"
+          annot "2 direct start" "$RUNNER_TEMP/direct.txt"
+
+      - name: Crash report and unified log
+        if: always()
+        run: |
+          . "$RUNNER_TEMP/annot.sh"
+          {
+            for f in "$HOME"/Library/Logs/DiagnosticReports/agent-usage-monitor*; do
+              [ -e "$f" ] && { echo "== $f"; head -c 5000 "$f"; }
+            done
+            echo "== unified log (last 3 min)"
+            /usr/bin/log show --last 3m --style compact --predicate 'process == "agent-usage-monitor" OR (eventMessage CONTAINS "agent-usage-monitor")' 2>&1 | tail -40
+          } > "$RUNNER_TEMP/crash.txt" 2>&1
+          cat "$RUNNER_TEMP/crash.txt"
+          annot "3 crash reports and log" "$RUNNER_TEMP/crash.txt"
+
+      - name: Start through Launch Services (like double-clicking)
+        if: always()
+        run: |
+          . "$RUNNER_TEMP/annot.sh"
+          pkill -f agent-usage-monitor || true
+          sleep 1
+          APP="$HOME/Applications-test/$APP_NAME.app"
+          {
+            echo "== open"; /usr/bin/open "$APP" 2>&1; echo "open exit code: $?"
+            sleep 12
+            echo "== running?"; pgrep -fl agent-usage-monitor || echo "NOT RUNNING"
+            echo "== lsappinfo"; /usr/bin/lsappinfo list 2>&1 | grep -i -B1 -A6 "usage" | head -20
+            echo "== startup-error.txt"; find "$HOME/Library/Application Support" -name startup-error.txt -exec sh -c 'echo "{}"; cat "{}"' \; 2>&1
+            echo "== crash reports"; ls -la "$HOME/Library/Logs/DiagnosticReports" 2>&1 | head
+          } > "$RUNNER_TEMP/open.txt" 2>&1
+          cat "$RUNNER_TEMP/open.txt"
+          annot "4 launch services" "$RUNNER_TEMP/open.txt"
