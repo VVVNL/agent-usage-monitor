@@ -34,12 +34,14 @@ mod tests {
         assert_eq!(key(false, Path::new("/ignored")), NAME);
     }
 
+    // Test paths come from the OS so they are absolute on every platform (a Unix-style "/var/..."
+    // literal is not absolute on Windows, where the tests also run).
     #[test]
     fn macos_key_is_an_absolute_path_inside_the_temp_dir() {
-        let tmp = Path::new("/var/folders/ab/xyz/T");
-        let k = key(true, tmp);
+        let tmp = std::env::temp_dir();
+        let k = key(true, &tmp);
         assert!(Path::new(&k).is_absolute(), "{k}");
-        assert!(Path::new(&k).starts_with(tmp));
+        assert!(Path::new(&k).starts_with(&tmp));
         assert!(k.ends_with("io.github.agent-usage-monitor.lock"));
     }
 
@@ -47,7 +49,8 @@ mod tests {
     fn macos_key_is_not_a_bare_relative_name() {
         // The original bug: a relative name resolves against the current directory, which is `/`
         // when the app is started from Finder.
-        assert_ne!(key(true, Path::new("/tmp")), NAME);
-        assert!(!Path::new(&key(true, Path::new("/tmp"))).is_relative());
+        let k = key(true, &std::env::temp_dir());
+        assert_ne!(k, NAME);
+        assert!(!Path::new(&k).is_relative());
     }
 }
