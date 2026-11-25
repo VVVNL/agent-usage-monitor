@@ -79,3 +79,21 @@ Use for every release. Tick each box in the release PR.
 - A release is only published by pushing a tag `vX.Y.Z`. Pushing commits to `main` runs CI only.
 - Every job has a `timeout-minutes`, and `ci.yml` cancels an older run when a newer push arrives on the
   same branch. Neither helps a job still *waiting for a runner*, which only times out after 24 hours.
+
+## Website
+
+The project page is the static site in `site/` (`index.html`, `404.html`; plain HTML and CSS, no build step,
+no external requests, so it follows the same privacy promise as the app). `.github/workflows/pages.yml`
+publishes it to GitHub Pages whenever `site/**` changes on `main`.
+
+- **One-time setup:** repository Settings > Pages > Build and deployment > Source: **GitHub Actions**. The
+  site appears at `https://<owner>.github.io/<repo>/` (for this project
+  `https://vvvnl.github.io/agent-usage-monitor/`). GitHub Pages on a **private** repository needs a paid
+  plan; on the free plan the repository must be **public**.
+- **Per release:** check the claims on the page still match the README's verification status (macOS and
+  Codex are described as unverified; change that wording only when they have been verified), the download
+  notes (SmartScreen warning disappears once builds are signed), and the widget illustration still looks like
+  the real widget.
+- **Preview locally:** open `site/index.html` in a browser; nothing else is needed.
+- The widget on the page is an HTML/CSS illustration with example numbers, not a screenshot. Replace it with
+  real screenshots only if they contain no personal data.

@@ -18,6 +18,9 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
+The project page lives in `site/` (plain HTML, no build step); see the Website section of
+`docs/RELEASE_CHECKLIST.md`.
+
 CI runs the same on Linux and Windows and macOS (the macOS jobs can be skipped with the `SKIP_MACOS` variable, see `docs/RELEASE_CHECKLIST.md`). GUI behaviour needs a real Windows session; say in the pull
 request what you verified and how, and what you could not.
 

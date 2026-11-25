@@ -20,6 +20,7 @@ See [Pending verification](#pending-verification) for exactly what must be check
 | Privacy and security | [docs/PRIVACY.md](docs/PRIVACY.md) |
 | How it works | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | Releasing | [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) |
+| Website | `site/` (published to GitHub Pages, see [Website](docs/RELEASE_CHECKLIST.md#website)) |
 
 ## How it gets data
 

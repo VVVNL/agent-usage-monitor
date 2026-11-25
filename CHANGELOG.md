@@ -4,6 +4,9 @@ All notable changes. Versions before 1.0 are betas.
 
 ## Unreleased
 
+- **Project website** in `site/` (single static page with an interactive widget illustration, features,
+  privacy, downloads, FAQ), published to GitHub Pages by `.github/workflows/pages.yml`. Needs Pages set to
+  "GitHub Actions" and, on a free plan, a public repository.
 - **Update notifications (stage 1 of docs/research/auto-update.md).** New `aum-update` crate and
   Settings > Updates. Off until you say yes: the app asks once, a few seconds after the first start
   (closing the window counts as no). Once a day, or on tray menu "Check for updates…", it lists the

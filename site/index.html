@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Usage Monitor</title>
+<meta name="description" content="A small, local-first tray app and floating widget that shows your Claude Code usage limits and which sessions are working. No account, no telemetry.">
+<meta name="color-scheme" content="light dark">
+<meta property="og:title" content="Agent Usage Monitor">
+<meta property="og:description" content="See your AI coding quota before it runs out. Local-first, read-only, no telemetry.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231e1e22'/%3E%3Crect x='6' y='10' width='20' height='4' rx='2' fill='%234e4e56'/%3E%3Crect x='6' y='10' width='12' height='4' rx='2' fill='%2334c759'/%3E%3Crect x='6' y='18' width='20' height='4' rx='2' fill='%234e4e56'/%3E%3Crect x='6' y='18' width='16' height='4' rx='2' fill='%23ffb300'/%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #fbfbfd; --surface: #ffffff; --text: #1c1c1e; --muted: #5b5b66; --line: #e3e3ea;
+  --accent: #0a6cff; --accent-text: #ffffff; --ok: #1f9d44; --warn: #b87900; --crit: #d1352b;
+  --soft: #f1f2f7; --shadow: 0 10px 30px rgba(20,20,40,.10);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #131316; --surface: #1c1c21; --text: #f2f2f5; --muted: #a4a4b0; --line: #2d2d35;
+    --accent: #4d94ff; --accent-text: #0b0b0e; --ok: #34c759; --warn: #ffb300; --crit: #ff6259;
+    --soft: #202027; --shadow: 0 10px 30px rgba(0,0,0,.45);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #131316; --surface: #1c1c21; --text: #f2f2f5; --muted: #a4a4b0; --line: #2d2d35;
+  --accent: #4d94ff; --accent-text: #0b0b0e; --ok: #34c759; --warn: #ffb300; --crit: #ff6259;
+  --soft: #202027; --shadow: 0 10px 30px rgba(0,0,0,.45);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+html, body { overflow-x: hidden; }
+body { margin: 0; background: var(--bg); color: var(--text); line-height: 1.55;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+a { color: var(--accent); }
+.wrap { max-width: 1060px; margin: 0 auto; padding: 0 20px; }
+header.top { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+header.top .wrap { display: flex; align-items: center; gap: 18px; height: 56px; }
+.brand { font-weight: 700; text-decoration: none; color: var(--text); display: flex; align-items: center; gap: 10px; }
+.brand svg { width: 22px; height: 22px; }
+nav { margin-left: auto; display: flex; gap: 18px; align-items: center; }
+nav a { color: var(--muted); text-decoration: none; font-size: 15px; }
+nav a:hover { color: var(--text); }
+.themebtn { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 8px;
+  padding: 5px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+.hero { padding: 64px 0 40px; }
+.hero .wrap { display: grid; grid-template-columns: 1.15fr .85fr; gap: 40px; align-items: center; }
+.badge { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  padding: 3px 10px; border-radius: 999px; background: var(--soft); border: 1px solid var(--line); color: var(--muted); }
+h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.08; margin: 14px 0 16px; letter-spacing: -.02em; }
+.lead { font-size: 19px; color: var(--muted); max-width: 34em; margin: 0 0 26px; }
+.cta { display: flex; gap: 12px; flex-wrap: wrap; }
+.btn { display: inline-block; padding: 11px 20px; border-radius: 10px; font-weight: 600; text-decoration: none;
+  border: 1px solid var(--line); color: var(--text); background: var(--surface); }
+.btn.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.fine { color: var(--muted); font-size: 14px; margin-top: 14px; }
+
+/* Widget illustration (HTML/CSS replica of the real widget) */
+.stage { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.wd { --w-bg:#1e1e22; --w-text:#fff; --w-sub:#a8a8b3; --w-track:#4e4e56; --w-div:#34343b;
+  width: 250px; background: var(--w-bg); color: var(--w-text); border-radius: 12px; padding: 12px;
+  box-shadow: var(--shadow); font-size: 12px; transition: width .2s; }
+.wd.light { --w-bg:#f5f5f7; --w-text:#1c1c1e; --w-sub:#55555f; --w-track:#d4d4da; --w-div:#e0e0e6; }
+.wd.compact { width: 240px; }
+.wd .head { display: flex; align-items: center; gap: 6px; }
+.wd .title { font-size: 13px; font-weight: 700; flex: 1; }
+.wd.compact .title { font-size: 12px; font-weight: 600; flex: 0 1 auto; }
+.wd .dot { width: 8px; height: 8px; border-radius: 50%; background: #0a84ff; display: none; }
+.wd.compact .dot { display: inline-block; }
+.wd .cnt { display: none; color: var(--w-sub); font-size: 11px; }
+.wd.compact .cnt { display: inline; }
+.wd .sp { flex: 1; }
+.wd:not(.compact) .sp { display: none; }
+.ic { width: 22px; height: 22px; display: grid; place-items: center; color: var(--w-sub); }
+.ic svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.wd .body { margin-top: 8px; }
+.wd.compact .body { display: none; }
+.bar { margin-bottom: 8px; }
+.bar .row { display: flex; justify-content: space-between; font-size: 11px; }
+.bar .row b { font-weight: 600; }
+.bar .row span { color: var(--w-sub); }
+.track { height: 6px; border-radius: 3px; background: var(--w-track); margin: 3px 0; overflow: hidden; }
+.track i { display: block; height: 100%; border-radius: 3px; }
+.bar small { color: var(--w-sub); font-size: 10px; }
+.chip { display: flex; align-items: center; gap: 6px; font-size: 11px; margin: 6px 0 2px; }
+.chip i { width: 8px; height: 8px; border-radius: 50%; background: #0a84ff; }
+.upd { color: var(--w-sub); font-size: 10px; margin-top: 6px; }
+.toggles { display: flex; gap: 8px; }
+.toggles button { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 8px;
+  padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+.toggles button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.cap { color: var(--muted); font-size: 12px; }
+
+section { padding: 56px 0; border-top: 1px solid var(--line); }
+section h2 { font-size: 30px; letter-spacing: -.01em; margin: 0 0 8px; }
+section .sub { color: var(--muted); margin: 0 0 28px; max-width: 40em; }
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
+.card h3 { margin: 0 0 6px; font-size: 17px; }
+.card p { margin: 0; color: var(--muted); font-size: 15px; }
+.steps { counter-reset: s; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding: 0; list-style: none; }
+.steps li { counter-increment: s; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
+.steps li::before { content: counter(s); display: inline-grid; place-items: center; width: 28px; height: 28px;
+  border-radius: 50%; background: var(--accent); color: var(--accent-text); font-weight: 700; margin-bottom: 10px; }
+.steps h3 { margin: 0 0 6px; font-size: 17px; }
+.steps p { margin: 0; color: var(--muted); font-size: 15px; }
+code, kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em;
+  background: var(--soft); border: 1px solid var(--line); padding: 1px 6px; border-radius: 6px; }
+.never { columns: 2; column-gap: 32px; padding-left: 20px; margin: 0; }
+.never li { margin-bottom: 8px; break-inside: avoid; }
+.dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.dl .card .tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; margin-bottom: 8px; }
+.tag.ok { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+.tag.beta { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+.card ul { margin: 10px 0 0; padding-left: 18px; color: var(--muted); font-size: 14px; }
+details { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; margin-bottom: 10px; }
+summary { cursor: pointer; font-weight: 600; }
+details p { color: var(--muted); margin: 10px 0 0; }
+footer { border-top: 1px solid var(--line); padding: 28px 0 48px; color: var(--muted); font-size: 14px; }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
+@media (max-width: 860px) {
+  .hero .wrap { grid-template-columns: 1fr; }
+  .grid, .steps, .dl { grid-template-columns: minmax(0, 1fr); }
+  .hero .wrap { grid-template-columns: minmax(0, 1fr); }
+  .never { columns: 1; }
+  nav a.hide-s { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .wd { transition: none; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#top">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#1e1e22"/><rect x="6" y="10" width="20" height="4" rx="2" fill="#4e4e56"/><rect x="6" y="10" width="12" height="4" rx="2" fill="#34c759"/><rect x="6" y="18" width="20" height="4" rx="2" fill="#4e4e56"/><rect x="6" y="18" width="16" height="4" rx="2" fill="#ffb300"/></svg>
+      Agent Usage Monitor
+    </a>
+    <nav aria-label="Main">
+      <a class="hide-s" href="#features">Features</a>
+      <a class="hide-s" href="#privacy">Privacy</a>
+      <a href="#download">Download</a>
+      <a href="https://github.com/VVVNL/agent-usage-monitor">GitHub</a>
+      <button class="themebtn" id="theme" type="button" aria-label="Switch between light and dark theme">Theme</button>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+<div class="hero">
+  <div class="wrap">
+    <div>
+      <span class="badge">Beta &middot; Windows first</span>
+      <h1>See your AI coding quota before it runs out.</h1>
+      <p class="lead">A tiny tray app and floating widget that shows your Claude Code session and weekly limits, and which sessions are working right now. It runs on your computer, reads nothing it shouldn&rsquo;t, and sends nothing anywhere.</p>
+      <div class="cta">
+        <a class="btn primary" href="#download">Download</a>
+        <a class="btn" href="https://github.com/VVVNL/agent-usage-monitor">View on GitHub</a>
+      </div>
+      <p class="fine">Free and open source (MIT). Not affiliated with Anthropic or OpenAI.</p>
+    </div>
+    <div class="stage">
+      <div class="wd" id="wd" aria-label="Illustration of the floating widget">
+        <div class="head">
+          <span class="title">Claude Code</span>
+          <span class="dot" aria-hidden="true"></span><span class="cnt">2</span>
+          <span class="sp"></span>
+          <span class="ic" title="Compact" aria-hidden="true"><svg viewBox="0 0 14 14"><path id="chev" d="M3 9L7 5L11 9"/></svg></span>
+          <span class="ic" aria-hidden="true"><svg viewBox="0 0 14 14"><path d="M12 7A5 5 0 1 1 8 2.2"/><path d="M6 0L10.4 2.2L6.2 5Z" fill="currentColor"/></svg></span>
+          <span class="ic" aria-hidden="true"><svg viewBox="0 0 14 14"><path d="M3.5 3.5L10.5 10.5M10.5 3.5L3.5 10.5"/></svg></span>
+        </div>
+        <div class="body">
+          <div class="bar"><div class="row"><b>Session</b><span>35%</span></div><div class="track"><i style="width:35%;background:#34c759"></i></div><small>resets in 4h 04m</small></div>
+          <div class="bar"><div class="row"><b>Weekly</b><span>82%</span></div><div class="track"><i style="width:82%;background:#ffb300"></i></div><small>resets in 4d 12h</small></div>
+          <div class="bar"><div class="row"><b>Weekly (Opus)</b><span>96%</span></div><div class="track"><i style="width:96%;background:#eb4034"></i></div><small>resets in 4d 12h</small></div>
+          <div class="chip"><i></i>2 working</div>
+          <div class="upd">Updated 1 min ago</div>
+        </div>
+      </div>
+      <div class="toggles" role="group" aria-label="Widget illustration options">
+        <button type="button" id="t-compact" aria-pressed="false">Compact</button>
+        <button type="button" id="t-light" aria-pressed="false">Light</button>
+      </div>
+      <div class="cap">Illustration with example numbers. Try the buttons.</div>
+    </div>
+  </div>
+</div>
+
+<section id="features">
+  <div class="wrap">
+    <h2>Everything you need to pace yourself</h2>
+    <p class="sub">Built for people who live in a terminal with an AI coding agent and would rather not discover a limit by hitting it.</p>
+    <div class="grid">
+      <div class="card"><h3>Real limits, not estimates</h3><p>Percentages and reset times are exactly what the provider reports. If a value is unavailable, the widget says so instead of guessing.</p></div>
+      <div class="card"><h3>Tray icon and floating widget</h3><p>A glanceable tray icon with the number on it, plus an optional always-on-top widget with opacity, themes, compact mode and click-through.</p></div>
+      <div class="card"><h3>Who is working right now</h3><p>See sessions that are working, waiting for your input, or just finished, with counts only. Optionally includes sessions running inside WSL.</p></div>
+      <div class="card"><h3>Alerts that respect you</h3><p>Optional notifications at 75% and 90%, when a limit is used up, or when it resets. One alert per event, never a stream.</p></div>
+      <div class="card"><h3>Light on your machine</h3><p>One small native program, around 13&nbsp;MB, with no background service. It checks every few minutes (your choice) and sleeps the rest of the time.</p></div>
+      <div class="card"><h3>Multi-monitor aware</h3><p>The widget remembers where you put it, and returns there when a display comes back after you unplug it.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <h2>How it works</h2>
+    <p class="sub">It does not scrape a website or read tokens. It asks the tool you already use.</p>
+    <ol class="steps">
+      <li><h3>Runs your CLI</h3><p>Every few minutes it runs <code>claude</code>&rsquo;s own usage command, with no shell involved and without saving a transcript.</p></li>
+      <li><h3>Reads the answer strictly</h3><p>The text is parsed by a fail-closed parser. Anything unexpected becomes a clear &ldquo;can&rsquo;t read usage&rdquo; message, never a wrong number.</p></li>
+      <li><h3>Shows it where you look</h3><p>The tray, the widget and optional notifications all show the same figures, with how stale they are.</p></li>
+    </ol>
+  </div>
+</section>
+
+<section id="privacy">
+  <div class="wrap">
+    <h2>Private by design</h2>
+    <p class="sub">The whole point is that it stays on your computer.</p>
+    <ul class="never">
+      <li>Never opens your Claude or Codex credential files, keychain entries or tokens.</li>
+      <li>Never reads conversations, transcripts or project files.</li>
+      <li>Never modifies Claude Code files or settings.</li>
+      <li>No telemetry, analytics or crash reporting. No account, no backend.</li>
+      <li>Checking usage costs no quota: the usage command makes no model call.</li>
+      <li>Update notifications are optional and off until you say yes; they only tell you, they never download or install anything.</li>
+    </ul>
+    <p class="fine"><a href="https://github.com/VVVNL/agent-usage-monitor/blob/main/docs/PRIVACY.md">Read the full privacy notes</a></p>
+  </div>
+</section>
+
+<section id="download">
+  <div class="wrap">
+    <h2>Download</h2>
+    <p class="sub">Beta releases are published on GitHub. Each file has a SHA-256 checksum next to it.</p>
+    <div class="dl">
+      <div class="card">
+        <span class="tag ok">Tested</span>
+        <h3>Windows 10 / 11 (64-bit)</h3>
+        <p>Installer (per-user, no admin rights) or a portable zip.</p>
+        <ul>
+          <li>The builds are not code-signed yet, so Windows SmartScreen may say &ldquo;unknown publisher&rdquo;: choose <em>More info</em>, then <em>Run anyway</em>.</li>
+          <li>Needs Claude Code installed and signed in.</li>
+        </ul>
+        <p style="margin-top:14px"><a class="btn primary" href="https://github.com/VVVNL/agent-usage-monitor/releases">Get it on GitHub</a></p>
+      </div>
+      <div class="card">
+        <span class="tag beta">Beta, untested on a Mac</span>
+        <h3>macOS</h3>
+        <p>Universal app (Apple Silicon and Intel) in a DMG.</p>
+        <ul>
+          <li>Written without access to a Mac, so expect rough edges.</li>
+          <li>Not notarized: right-click the app and choose <em>Open</em> the first time.</li>
+        </ul>
+        <p style="margin-top:14px"><a class="btn" href="https://github.com/VVVNL/agent-usage-monitor/releases">Get it on GitHub</a></p>
+      </div>
+      <div class="card">
+        <span class="tag ok">Command line</span>
+        <h3>Linux</h3>
+        <p>No tray app yet. The <code>aum</code> command prints your limits in the terminal, with <code>--json</code> for scripts.</p>
+        <ul><li>x86-64 archive on the same releases page.</li></ul>
+        <p style="margin-top:14px"><a class="btn" href="https://github.com/VVVNL/agent-usage-monitor/releases">Get it on GitHub</a></p>
+      </div>
+    </div>
+    <p class="fine">Codex CLI support exists but has not been checked against a real Codex yet. Build from source: <code>cargo build --release -p aum-app</code>.</p>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <h2>Questions</h2>
+    <details><summary>Does it work with a Claude Team or Enterprise plan?</summary><p>It shows whatever Claude Code&rsquo;s own usage command shows for the account you are signed in with, so it follows your plan.</p></details>
+    <details><summary>Will it use up my quota?</summary><p>No. The usage command makes no model call. It costs zero tokens.</p></details>
+    <details><summary>Why does Windows warn me about the installer?</summary><p>The builds are unsigned for now, and SmartScreen is cautious with unsigned, little-downloaded files. Verify the SHA-256 checksum from the release page if you want to be sure the file is intact. Signing is planned.</p></details>
+    <details><summary>Where does it store things?</summary><p>Only a few small files in your user settings folder (settings, a cache of the last numbers, and notification memory). The tray menu has &ldquo;Open settings folder&rdquo;. Deleting that folder resets everything.</p></details>
+    <details><summary>Is it official?</summary><p>No. It is an independent open-source project, not affiliated with or endorsed by Anthropic or OpenAI.</p></details>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Agent Usage Monitor &middot; MIT licence &middot; interface built with <a href="https://slint.dev">Slint</a></span>
+    <span><a href="https://github.com/VVVNL/agent-usage-monitor">Source</a> &middot; <a href="https://github.com/VVVNL/agent-usage-monitor/blob/main/CHANGELOG.md">Changelog</a> &middot; <a href="https://github.com/VVVNL/agent-usage-monitor/issues">Report a problem</a></span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  try { var saved = localStorage.getItem('theme'); if (saved) root.setAttribute('data-theme', saved); } catch (e) {}
+  document.getElementById('theme').addEventListener('click', function () {
+    var dark = root.getAttribute('data-theme') === 'dark' ||
+      (!root.getAttribute('data-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    var next = dark ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch (e) {}
+  });
+  var wd = document.getElementById('wd'), chev = document.getElementById('chev');
+  function toggle(id, cls, on, off) {
+    var b = document.getElementById(id);
+    b.addEventListener('click', function () {
+      var now = wd.classList.toggle(cls);
+      b.setAttribute('aria-pressed', String(now));
+      b.textContent = now ? on : off;
+      if (cls === 'compact') chev.setAttribute('d', now ? 'M3 5L7 9L11 5' : 'M3 9L7 5L11 9');
+    });
+  }
+  toggle('t-compact', 'compact', 'Full size', 'Compact');
+  toggle('t-light', 'light', 'Dark', 'Light');
+})();
+</script>
+</body>
+</html>
