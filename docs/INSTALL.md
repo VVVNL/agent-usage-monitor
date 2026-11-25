@@ -1,6 +1,7 @@
 # Installing Agent Usage Monitor
 
-Windows 10 or 11 (64-bit). No developer tools needed.
+Windows 10 or 11 (64-bit) is the tested platform. A macOS build (beta, never run on a real Mac) and a
+Linux command-line tool are also published; see their sections below. No developer tools needed.
 
 ## Before you start
 
@@ -13,7 +14,7 @@ Agent Usage Monitor reads your limits from **Claude Code itself**, so you need:
 ## Option A: installer (recommended)
 
 1. Download `agent-usage-monitor-<version>-setup.exe` from the
-   [Releases](https://github.com/OWNER/agent-usage-monitor/releases) page.
+   [Releases](https://github.com/VVVNL/agent-usage-monitor/releases) page.
 2. Run it. It installs for your user only (no administrator prompt) into
    `%LOCALAPPDATA%\Programs\AgentUsageMonitor`.
 3. Optional: tick **Start when I sign in to Windows**.
@@ -24,7 +25,7 @@ first run. Click **More info**, then **Run anyway**. You can compare the file wi
 from the release page:
 
 ```powershell
-Get-FileHash .\agent-usage-monitor-0.9.0-setup.exe -Algorithm SHA256
+Get-FileHash .\agent-usage-monitor-<version>-setup.exe -Algorithm SHA256
 ```
 
 ## Option B: portable
@@ -54,6 +55,20 @@ Download `agent-usage-monitor-<version>-windows-x64-portable.zip`, unzip anywher
 
 Settings live in `~/Library/Application Support/AgentUsageMonitor/config`. Uninstall: turn off
 *Launch at login*, quit, delete the app and that folder.
+
+## Linux (command-line tool only)
+
+There is no Linux tray app yet. The `aum` tool prints the same limits in a terminal:
+
+```bash
+tar -xzf aum-<version>-linux-x64.tar.gz
+./aum-<version>-linux-x64/aum            # Claude Code
+./aum-<version>-linux-x64/aum --json     # machine-readable
+./aum-<version>-linux-x64/aum --codex    # Codex CLI (experimental)
+```
+
+Compare the archive with `SHA256SUMS-linux.txt` (`sha256sum -c SHA256SUMS-linux.txt`). Tested with Claude
+Code in WSL Ubuntu. The same tool is included as `aum.exe` in the Windows downloads.
 
 ## Codex CLI
 

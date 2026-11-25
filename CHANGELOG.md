@@ -4,6 +4,9 @@ All notable changes. Versions before 1.0 are betas.
 
 ## Unreleased
 
+- Docs: README and website now state exactly what runs where (Windows tested, macOS beta never run on a
+  Mac, Linux `aum` only) and per provider (Claude Code supported; Codex CLI experimental, off by default,
+  limits only). Install guide gains a Linux section; `OWNER` placeholders replaced with the real repository.
 - **Project website** in `site/`: one short page for users (what the widget shows, explained on an annotated
   picture; three steps to get started; one paragraph on privacy), published to GitHub Pages by
   `.github/workflows/pages.yml`. Needs Pages set to "GitHub Actions".

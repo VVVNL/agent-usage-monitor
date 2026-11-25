@@ -85,7 +85,7 @@ the stored ETag.
 - Parse only: `tag_name`, `prerelease`, `draft`, `html_url`, `published_at` and, per asset, `name`,
   `browser_download_url`, `size`. Fail closed on anything unexpected, like the Claude parsers; keep a fixture
   recorded from the real v0.11.0 release.
-- The repository is a compile-time constant (forks change one line). The `OWNER` placeholders in
+- The repository is a compile-time constant (forks change one line). The `OWNER` placeholders (since replaced) in
   `docs/INSTALL.md` and `installer/agent-usage-monitor.iss` get replaced at the same time.
 - Alternative if the API ever becomes a problem: the public `releases.atom` feed (no rate limit, includes
   prereleases, XML). Not needed now.

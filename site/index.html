@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent Usage Monitor</title>
-<meta name="description" content="A small widget for Windows that shows how much of your Claude Code usage limits you have left, and when they reset.">
+<meta name="description" content="A small widget that shows how much of your Claude Code usage limits you have left and when they reset. Windows, with a macOS beta and a Linux command-line tool. Codex CLI support is experimental.">
 <meta name="color-scheme" content="light dark">
 <meta property="og:title" content="Agent Usage Monitor">
-<meta property="og:description" content="Know how much Claude Code you have left. A small, free widget for Windows.">
+<meta property="og:description" content="Know how much Claude Code you have left. A small, free widget for Windows, with a macOS beta.">
 <meta property="og:type" content="website">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231e1e22'/%3E%3Crect x='6' y='10' width='20' height='4' rx='2' fill='%234e4e56'/%3E%3Crect x='6' y='10' width='12' height='4' rx='2' fill='%2334c759'/%3E%3Crect x='6' y='18' width='20' height='4' rx='2' fill='%234e4e56'/%3E%3Crect x='6' y='18' width='16' height='4' rx='2' fill='%23ffb300'/%3E%3C/svg%3E">
 <style>
@@ -101,11 +101,23 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 .trust p { margin: 0 0 12px; }
 .trust .fine { font-size: 15px; }
 
+.cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.col { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 22px; }
+.col h3 { margin: 0 0 14px; font-size: 18px; }
+.ok-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.ok-list span:not(.pill) { color: var(--muted); }
+.pill { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; margin-left: 6px; vertical-align: 1px; }
+.pill.ok { background: color-mix(in srgb, #34c759 18%, transparent); color: #1f9d44; }
+.pill.beta { background: color-mix(in srgb, #ffb300 20%, transparent); color: #a86f00; }
+.pill.plain { background: var(--soft); color: var(--muted); border: 1px solid var(--line); }
+@media (prefers-color-scheme: dark) { .pill.ok { color: #34c759; } .pill.beta { color: #ffb300; } }
+
 footer { border-top: 1px solid var(--line); padding: 26px 0 44px; color: var(--muted); font-size: 14px; }
 footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
 
 @media (max-width: 760px) {
   .explain { grid-template-columns: minmax(0, 1fr); gap: 36px; }
+  .cols { grid-template-columns: minmax(0, 1fr); }
   .figure { padding-left: 40px; }
   header nav .hide-s { display: none; }
 }
@@ -134,7 +146,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
       <a class="btn primary" href="#start">Download for Windows</a>
       <a class="btn" href="#explain">What it shows</a>
     </div>
-    <p class="fine">Free and open source. Not made by Anthropic.</p>
+    <p class="fine">Free and open source. Not made by Anthropic or OpenAI.</p>
   </div>
 </div>
 
@@ -168,23 +180,45 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
   </div>
 </section>
 
+<section id="works">
+  <div class="wrap">
+    <h2>What it works with</h2>
+    <div class="cols">
+      <div class="col">
+        <h3>Your computer</h3>
+        <ul class="ok-list">
+          <li><b>Windows 10 and 11</b> <span class="pill ok">Tested</span><br><span>Tray icon and floating widget. Tested on Windows 11.</span></li>
+          <li><b>macOS</b> <span class="pill beta">Beta</span><br><span>Menu bar and floating widget. Built, but not yet tried on a real Mac.</span></li>
+          <li><b>Linux</b> <span class="pill plain">Command line</span><br><span>No widget yet: the <code>aum</code> command prints your limits in a terminal.</span></li>
+        </ul>
+      </div>
+      <div class="col">
+        <h3>Your coding agent</h3>
+        <ul class="ok-list">
+          <li><b>Claude Code</b> <span class="pill ok">Supported</span><br><span>Session and weekly limits, reset times, and which sessions are working or waiting for you.</span></li>
+          <li><b>Codex CLI</b> <span class="pill beta">Experimental</span><br><span>Session and weekly limits. Off until you turn it on in Settings, and not yet tested with a real Codex.</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="start">
   <div class="wrap">
     <h2>Get started in three steps</h2>
     <ol class="steps">
-      <li><span class="n">1</span><div><h3>Have Claude Code ready</h3><p>Claude Code must be installed and signed in. If <code>claude</code> works in a terminal, you&rsquo;re set.</p></div></li>
-      <li><span class="n">2</span><div><h3>Download and run the installer</h3><p>Get <code>agent-usage-monitor-&hellip;-setup.exe</code> from the releases page. No admin rights needed. Windows may say &ldquo;unknown publisher&rdquo; because the app isn&rsquo;t signed yet: choose <em>More info</em>, then <em>Run anyway</em>.</p></div></li>
-      <li><span class="n">3</span><div><h3>Look at your screen</h3><p>The widget appears in the top-right corner and an icon appears in the system tray. Drag the widget anywhere; right-click the tray icon for settings.</p></div></li>
+      <li><span class="n">1</span><div><h3>Have Claude Code ready</h3><p>Claude Code must be installed and signed in with a Claude subscription. If <code>claude</code> works in a terminal, you&rsquo;re set.</p></div></li>
+      <li><span class="n">2</span><div><h3>Download and run the installer</h3><p>Get <code>agent-usage-monitor-&hellip;-setup.exe</code> from the releases page. No admin rights needed. Windows may say &ldquo;unknown publisher&rdquo; because the app isn&rsquo;t signed yet: choose <em>More info</em>, then <em>Run anyway</em>. On a Mac, open the <code>.dmg</code>, drag the app to Applications, and right-click it and choose <em>Open</em> the first time.</p></div></li>
+      <li><span class="n">3</span><div><h3>Look at your screen</h3><p>The widget appears in the top-right corner and an icon appears in the system tray (on a Mac, in the menu bar). Drag the widget anywhere; right-click the tray icon for settings.</p></div></li>
     </ol>
     <p class="center"><a class="btn primary" href="https://github.com/VVVNL/agent-usage-monitor/releases">Go to the releases page</a></p>
-    <p class="fine center">Also there: a macOS version (beta, not yet tested on a real Mac) and a command-line tool for Linux.</p>
-  </div>
+      </div>
 </section>
 
 <section id="privacy">
   <div class="wrap trust">
     <h2>Stays on your computer</h2>
-    <p>It asks Claude Code for the same numbers you&rsquo;d see by typing <code>/usage</code>. It never reads your passwords or conversations, sends none of your data anywhere, and checking doesn&rsquo;t use up your allowance. The only thing it can ask the internet, if you allow it, is whether a newer version exists.</p>
+    <p>It asks Claude Code for the same numbers you&rsquo;d see by typing <code>/usage</code> (and Codex for its own, if you turn that on). It never reads your passwords or conversations, sends none of your data anywhere, and checking doesn&rsquo;t use up your allowance. The only thing it can ask the internet, if you allow it, is whether a newer version exists.</p>
     <p class="fine"><a href="https://github.com/VVVNL/agent-usage-monitor/blob/main/docs/PRIVACY.md">Privacy details</a></p>
   </div>
 </section>
@@ -192,7 +226,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
 
 <footer>
   <div class="wrap">
-    <span>Agent Usage Monitor &middot; open source (MIT) &middot; not affiliated with Anthropic</span>
+    <span>Agent Usage Monitor &middot; open source (MIT) &middot; not affiliated with Anthropic or OpenAI</span>
     <span><a href="https://github.com/VVVNL/agent-usage-monitor">Source code</a> &middot; <a href="https://github.com/VVVNL/agent-usage-monitor/issues">Report a problem</a></span>
   </div>
 </footer>

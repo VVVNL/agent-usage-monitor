@@ -1,15 +1,27 @@
 # Agent Usage Monitor
 
-A small, local-first tray / menu bar app and floating widget that shows your **Claude Code** and
-**Codex CLI** subscription limits: session (5-hour), weekly, and any model-specific limit, with reset
-countdowns and alerts before you run out.
+A small, local-first tray / menu bar app and floating widget that shows how much of your **Claude Code**
+subscription limits you have used (session, weekly and any model-specific limit), when they reset, and
+which Claude Code sessions are working right now, with alerts before you run out. **Codex CLI** limits are
+supported experimentally.
 
-**Status: 0.11.0 beta.**
+**Status: 0.11.0 beta.** Download from [GitHub Releases](https://github.com/VVVNL/agent-usage-monitor/releases).
+Website: <https://vvvnl.github.io/agent-usage-monitor/>.
 
-| | Claude Code | Codex CLI |
-|---|---|---|
-| **Windows 10/11 x64** | Verified on a real machine | Built and tested against the published protocol schema; **never run against a real Codex** |
-| **macOS 11+ (Apple Silicon and Intel)** | Written and type-checked for macOS; **never run on a Mac** | same as above |
+### Platforms
+
+| | Windows 10/11 x64 | macOS 11+ (Apple Silicon and Intel) | Linux x64 |
+|---|---|---|---|
+| **What you get** | Tray icon, floating widget, settings, alerts | Menu bar item, floating widget, settings, alerts | No app yet: the `aum` command-line tool |
+| **Download** | Installer (per-user) or portable zip, both with `aum.exe` | Universal DMG | `aum` archive |
+| **Tested** | Yes, on a real Windows 11 machine (Windows 10 not tried) | **No: built and type-checked, never run on a Mac** | `aum` with Claude Code (in WSL Ubuntu) |
+
+### Providers
+
+| | Limits | Session activity | Status |
+|---|---|---|---|
+| **Claude Code** | Session, weekly, per-model weekly; plan and login state | Working / needs input / finished, plus the WSL bridge on Windows | Verified on Windows, and with `aum` on Linux |
+| **Codex CLI** | Session, weekly, extra metered buckets | Not available (Codex has no session-listing interface) | **Experimental, off by default** (Settings). Built from Codex's published schema; **never run against a real Codex** |
 
 See [Pending verification](#pending-verification) for exactly what must be checked before 1.0.
 
@@ -163,7 +175,7 @@ cargo test --workspace            # works on any OS
 cargo run -p aum-cli              # headless: print current limits
 cargo run -p aum-cli -- --codex  # headless: query Codex CLI instead
 cargo build --release -p aum-app  # Windows or macOS: the tray app and widget
-scripts/macos-bundle.sh 0.10.0    # macOS only: universal .app and DMG
+scripts/macos-bundle.sh <version> # macOS only: universal .app and DMG
 ```
 
 `python3 scripts/third_party.py` regenerates [docs/THIRD_PARTY.md](docs/THIRD_PARTY.md). The installer
@@ -186,7 +198,8 @@ Release build, widget showing, polling every minute (the minimum) against the re
 
 Cold start was not measured separately; the tray icon registers and the first data arrives within about
 30 seconds, which is dominated by running `claude`. At the default 5-minute interval the app starts two
-short-lived processes every five minutes and makes no network connections of its own.
+short-lived processes every five minutes and makes no network connections of its own (the optional update
+check, off by default, is the one exception).
 
 ## Verification status
 
@@ -263,14 +276,12 @@ These were deliberately deferred and must be done before 1.0:
 - [ ] **A real Mac.** Install the DMG (right-click > Open), then check: menu bar text, widget placement
       on the main and a second display, Esc/R, opacity, always-on-top, notifications, launch at login,
       `claude` found when started from Finder, Quit leaves nothing running.
-- [ ] **`windows-msvc` build and installer from CI.** Push to GitHub, let the workflow build the
-      artifacts that ship, install and run them, and repeat the checks above. The installer script has
-      never been compiled; CI will do that first.
+- [ ] **The shipped builds.** CI built and published v0.11.0 (`windows-msvc` installer and portable zip,
+      macOS DMG, Linux `aum`). Still to do: install and run the released installer and zip on Windows and
+      repeat the checks above; all earlier Windows checks used a `windows-gnu` development build.
 - [ ] **By eye:** tray icon on a live taskbar at 100/150/200% scaling; drag the widget with the mouse;
       `Esc` and `R`; second monitor; rounded corners and opacity; a toast actually appearing, with the
       right name after installing.
-- [ ] **Replace the `OWNER` placeholder** in `docs/INSTALL.md` and `installer/agent-usage-monitor.iss`
-      with the real repository.
 - [ ] **Slint licence.** The UI uses Slint under its royalty-free desktop licence, which requires the
       attribution shown at the bottom of Settings. Confirm that is acceptable for an MIT project (the
       alternatives are GPLv3 for the whole app, or a commercial licence).
@@ -288,10 +299,10 @@ These were deliberately deferred and must be done before 1.0:
 | 0.1 | Windows tray app |
 | 0.2 | Floating widget |
 | 0.9 | Settings, alerts, launch at login, installer, documentation |
-| 1.0 | After the pending verification above |
 | 0.10 | Codex CLI provider, macOS support (both unproven on real hardware/software) |
-| **0.11 (this)** | Session activity (working / needs input / finished) with the WSL bridge, Claude Code only |
-| later | Linux |
+| **0.11 (this)** | Session activity (working / needs input / finished) with the WSL bridge, Claude Code only; release builds for Windows, macOS and Linux (`aum`); optional update notifications; website |
+| 1.0 | After the pending verification above |
+| later | Code signing, Codex session activity (through Codex hooks), a Linux tray app |
 
 ## Licence
 
