@@ -6,6 +6,8 @@
 //! Current week (all models): 28% used · resets Nov 15, 6am (Europe/London)
 //! Current week (Fable): 0% used · resets Nov 15, 6am (Europe/London)
 //! ```
+//! A newer wording separates date and time with " at" instead of a comma
+//! (`resets Nov 26 at 12:19am (Europe/London)`); both are accepted.
 //! Anything else is reported back as unrecognised. A missing limit is never
 //! turned into 0%.
 
@@ -25,7 +27,9 @@ static LINE: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 static RESET: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^([A-Z][a-z]{2}) (\d{1,2}), (\d{1,2})(?::(\d{2}))?(am|pm)$").expect("valid regex")
+    // "Nov 10, 4:10pm" (Claude Code 2.1.322) or "Nov 26 at 12:19am" (seen on a Mac on 2026-11-26).
+    Regex::new(r"^([A-Z][a-z]{2}) (\d{1,2})(?:,| at) (\d{1,2})(?::(\d{2}))?(am|pm)$")
+        .expect("valid regex")
 });
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -92,7 +96,7 @@ fn parse_line(line: &str, now: DateTime<Utc>) -> Option<UsageWindow> {
     ))
 }
 
-/// "Nov 10, 4:10pm" / "Nov 15, 6am" in `tz`, with the year inferred.
+/// "Nov 10, 4:10pm" / "Nov 15 at 6am" in `tz`, with the year inferred.
 ///
 /// Reset times are always in the near future, so the year is the current
 /// local year unless that would put the date more than a day in the past
@@ -342,5 +346,51 @@ mod tests {
         let long = format!("Current session: {}", "x".repeat(500));
         let err = parse_usage(&long, Utc::now()).unwrap_err().to_string();
         assert!(err.len() < 250, "capped: {}", err.len());
+    }
+
+    #[test]
+    fn newer_wording_with_at_instead_of_comma_is_read() {
+        // Real output from a Mac (2026-11-26): "resets Nov 26 at 12:19am (Europe/London)".
+        let text = include_str!("../../../../tests/fixtures/claude/usage/text_mac_at_format.txt");
+        let now = Utc.with_ymd_and_hms(2026, 11, 25, 22, 0, 0).unwrap();
+        let parsed = parse_usage(text, now).unwrap();
+        assert_eq!(parsed.unrecognized, Vec::<String>::new());
+        assert_eq!(parsed.windows.len(), 2);
+        let (s, w) = (&parsed.windows[0], &parsed.windows[1]);
+        assert_eq!((s.kind.clone(), s.used_percent), (WindowKind::Session, 16));
+        assert_eq!((w.kind.clone(), w.used_percent), (WindowKind::Weekly, 32));
+        // London is on GMT in November, so local time equals UTC.
+        assert_eq!(
+            s.resets_at,
+            Utc.with_ymd_and_hms(2026, 11, 26, 0, 19, 0).unwrap()
+        );
+        assert_eq!(
+            w.resets_at,
+            Utc.with_ymd_and_hms(2026, 11, 29, 5, 59, 0).unwrap()
+        );
+    }
+
+    #[test]
+    fn both_wordings_give_the_same_instant() {
+        let now = Utc.with_ymd_and_hms(2026, 11, 10, 12, 0, 0).unwrap();
+        let tz: Tz = "Europe/London".parse().unwrap();
+        assert_eq!(
+            parse_reset("Nov 10, 4:10pm", tz, now),
+            parse_reset("Nov 10 at 4:10pm", tz, now)
+        );
+        assert_eq!(
+            parse_reset("Nov 15, 6am", tz, now),
+            parse_reset("Nov 15 at 6am", tz, now)
+        );
+        // Still strict: other connectors and stray text stay unrecognised.
+        for bad in [
+            "Nov 10 4:10pm",
+            "Nov 10 on 4:10pm",
+            "Nov 10, at 4:10pm",
+            "Nov 10 at",
+            "at 4:10pm",
+        ] {
+            assert_eq!(parse_reset(bad, tz, now), None, "{bad}");
+        }
     }
 }

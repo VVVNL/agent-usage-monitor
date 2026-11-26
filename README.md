@@ -5,7 +5,7 @@ subscription limits you have used (session, weekly and any model-specific limit)
 which Claude Code sessions are working right now, with alerts before you run out. **Codex CLI** limits are
 supported experimentally.
 
-**Status: 0.11.1 beta.** Download from [GitHub Releases](https://github.com/VVVNL/agent-usage-monitor/releases).
+**Status: 0.11.2 beta.** Download from [GitHub Releases](https://github.com/VVVNL/agent-usage-monitor/releases).
 Website: <https://vvvnl.github.io/agent-usage-monitor/>.
 
 ### Platforms
@@ -126,7 +126,8 @@ out to keep it visible). Hover for the numbers; right-click for the menu.
 
 ## Known limitations
 
-- It depends on the **text format** of `/usage`. If Anthropic changes the wording, the parser shows
+- It depends on the **text format** of `/usage`. Two wordings of the reset time are understood
+  (`resets Nov 10, 4:10pm` and the newer `resets Nov 26 at 12:19am`); if Anthropic changes it again, the parser shows
   "unrecognised output" or "no data" rather than guessing. Fixtures live in
   `tests/fixtures/claude/usage`.
 - Percentages are whole numbers (all Claude Code prints), and reset times can wobble by a minute
@@ -305,7 +306,7 @@ These were deliberately deferred and must be done before 1.0:
 | 0.2 | Floating widget |
 | 0.9 | Settings, alerts, launch at login, installer, documentation |
 | 0.10 | Codex CLI provider, macOS support (both unproven on real hardware/software) |
-| **0.11 (this, 0.11.1)** | Session activity (working / needs input / finished) with the WSL bridge, Claude Code only; release builds for Windows, macOS and Linux (`aum`); optional update notifications; website |
+| **0.11 (this, 0.11.2)** | Session activity (working / needs input / finished) with the WSL bridge, Claude Code only; release builds for Windows, macOS and Linux (`aum`); optional update notifications; website |
 | 1.0 | After the pending verification above |
 | later | Code signing, Codex session activity (through Codex hooks), a Linux tray app |
 

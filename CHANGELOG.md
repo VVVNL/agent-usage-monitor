@@ -2,8 +2,12 @@
 
 All notable changes. Versions before 1.0 are betas.
 
-## Unreleased
+## 0.11.2 (beta)
 
+- **Fixed: "limit lines in an unrecognised format" on a Mac.** Newer Claude Code prints reset times as
+  `resets Nov 26 at 12:19am (Europe/London)` (with "at", no comma); the parser only knew the comma form.
+  Both are read now, with the real Mac output added as a fixture (`text_mac_at_format.txt`). This is likely
+  to affect any platform running a newer Claude Code, not only macOS.
 - The "limit line(s) in an unrecognised format" error now quotes the first line it could not read (a limit
   line holds only a percentage, a reset time and a time zone), so a format difference on another OS or
   locale can be diagnosed from the error alone.
