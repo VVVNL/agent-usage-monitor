@@ -1,0 +1,34 @@
+// Asks, then shows progress for, installing a newer version. Pure presentation: the checks and the
+// download happen in Rust (crates/update); this window only shows state and reports clicks.
+import { Button, ProgressIndicator } from "std-widgets.slint";
+
+export component UpdateInstallWindow inherits Window {
+    title: "Update Agent Usage Monitor";
+    preferred-width: 460px;
+    in property <string> heading;
+    in property <string> message;
+    // Downloading and checking: buttons are hidden and a progress bar runs.
+    in property <bool> busy: false;
+    // Finished or failed: only Close (and maybe the release page) remain.
+    in property <bool> done: false;
+    in property <bool> show-page-button: false;
+    callback install();
+    callback open-page();
+    callback dismiss();
+
+    VerticalLayout {
+        padding: 20px;
+        spacing: 12px;
+        Text { text: root.heading; font-size: 16px; font-weight: 700; wrap: word-wrap; }
+        Text { text: root.message; font-size: 12px; wrap: word-wrap; }
+        if root.busy: ProgressIndicator { indeterminate: true; }
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: end;
+            if root.show-page-button && !root.busy: Button { text: "Open release page"; clicked => { root.open-page(); } }
+            if !root.busy && !root.done: Button { text: "Not now"; clicked => { root.dismiss(); } }
+            if !root.busy && !root.done: Button { text: "Install now"; primary: true; clicked => { root.install(); } }
+            if !root.busy && root.done: Button { text: "Close"; primary: true; clicked => { root.dismiss(); } }
+        }
+    }
+}

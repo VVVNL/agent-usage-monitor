@@ -1,0 +1,2 @@
+52cb3a59148307844ddf45380ac5c6fa7029aed1e2ef8091ce860ae7cca2239e  agent-usage-monitor-0.11.2-setup.exe
+d454b48c119ad47f79b3ec083f1774d12f41a377831c89b3a282772bd6f25e9b  agent-usage-monitor-0.11.2-windows-x64-portable.zip

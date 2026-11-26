@@ -11,7 +11,9 @@ crates/
   platform    the only unsafe code, one module per OS: opacity, rounded corners, monitors,
               launch at login, notifications (Windows: Win32/registry/WinRT; macOS: AppKit/LaunchAgent/osascript)
   update      optional "is there a newer release?" check: GitHub release list via the system `curl`,
-              version rules, throttling, remembered result (pure logic, tested; never downloads or installs)
+              version rules, throttling, remembered result; and, for setup-installed Windows copies, the
+              verified download of the installer (signed checksum list + SHA-256, Ed25519). The pure logic is
+              tested with a scripted `curl`; the shell only runs the installer after the user confirms
   cli         `aum`, a headless runner
 ```
 

@@ -58,6 +58,10 @@ export component SettingsWindow inherits Window {
     in property <string> version;
     // Only Windows has WSL.
     in property <bool> show-wsl: false;
+    // What the update check knows, and what the button next to it does (check, or install / open page).
+    in property <string> update-status;
+    in property <string> update-button-text: "Check now";
+    callback update-clicked();
     callback changed(SettingsForm);
     callback test-notification();
 
@@ -206,7 +210,9 @@ export component SettingsWindow inherits Window {
                     checked: root.form.update-check;
                     toggled => { root.form.update-check = self.checked; root.changed(root.form); }
                 }
-                Text { text: "Asks GitHub (api.github.com) whether a newer release exists. It only tells you: nothing is downloaded or installed, and no usage data is sent. Off by default; the tray menu's \"Check for updates\" works either way."; font-size: 11px; height: 76px; wrap: word-wrap; opacity: 0.7; }
+                Text { text: "Asks GitHub (api.github.com) whether a newer release exists; no usage data is sent. Off by default; \"Check now\" and the tray menu's \"Check for updates\" work either way. A copy installed with the setup program can also install the update when you choose to; nothing is downloaded or run without your click."; font-size: 11px; height: 92px; wrap: word-wrap; opacity: 0.7; }
+                Text { text: root.update-status; font-size: 12px; wrap: word-wrap; accessible-role: text; accessible-label: "Update status: " + root.update-status; }
+                Button { text: root.update-button-text; accessible-label: "Update action"; clicked => { root.update-clicked(); } }
                 Switch {
                     text: "Include beta (pre-release) versions";
                     checked: root.form.update-beta;

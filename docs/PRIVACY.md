@@ -70,5 +70,24 @@ even with the daily check off.
 - **What is stored:** `update.json` in the settings folder (time of the last check, an ETag so the next
   question can be answered "unchanged", the tags seen, the last error). Delete it any time.
 - **What it does with a newer version:** shows "Update available: X" in the tray menu and one notification.
-  Choosing it opens the release page in your browser. **Nothing is downloaded, installed or run by the app.**
-- Frequency: at most once every 24 hours, plus your own clicks (at most one request a minute).
+  Choosing it opens the release page in your browser, **except** on a Windows copy installed with the setup
+  program (see below). The check itself never downloads, installs or runs anything.
+
+### Installing an update (Windows, setup-installed copies only)
+
+Only after you choose "Update available: X — install…" and confirm "Install now". Then, still through `curl`
+and only from `github.com` and GitHub's own download hosts over HTTPS:
+
+1. It downloads `SHA256SUMS.txt` and `SHA256SUMS.txt.sig` from that release and checks the signature with the
+   project's public key built into the program. If there is no key, or the signature is wrong, **nothing else is
+   downloaded** and nothing runs.
+2. It downloads the installer, and checks that its SHA-256 equals the signed list's entry for it.
+3. It checks the installer once more right before running it, starts it (`/SILENT`, no reboot) and closes
+   itself; the installer replaces the program in your user folder and starts the new version. No
+   administrator rights. Settings and cache are kept.
+
+The downloads go to `updates\` in the settings folder and are deleted afterwards. Closing the window while it
+downloads cancels the install. The portable zip and macOS only open the release page. Nothing about your usage
+is sent.
+- Frequency: at most once every 24 hours, plus your own clicks (at most one request a minute). Installing
+  an update makes three more requests (two small files and the installer), only when you ask.

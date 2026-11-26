@@ -1,7 +1,7 @@
 # Study: auto-update without an update server
 
-Status: **stage 1 (notify only) is built** (0.11.x, see CHANGELOG and docs/PRIVACY.md); stages 2 and 3 are
-design only. Decisions taken 2026-11-25: stage 1 go, automatic check off until enabled and asked once, channel
+Status: **stage 1 (notify only) is built; stage 2 for Windows is built** (see CHANGELOG, docs/PRIVACY.md and
+the section "Stage 2 as built" below); macOS and portable installs stay notify-only. Decisions taken 2026-11-25: stage 1 go, automatic check off until enabled and asked once, channel
 default `beta`, transport `curl`. Split out of the former signing-and-updates study on
 2026-11-25; code signing is in [code-signing.md](code-signing.md). Items marked *(unverified)* come from
 memory or secondary sources and must be checked before code depends on them.
@@ -155,6 +155,26 @@ winget, Scoop and Homebrew update installs through their own tooling and their o
 in our app, only manifests once signed releases exist (see code-signing.md, phase 4). A package-managed
 install should preferably say "update available, run `winget upgrade`" instead of offering stage 2; detecting
 that reliably is *(unverified)*.
+
+## Stage 2 as built (Windows, 2026-11-26)
+
+Decisions (asked 2026-11-26): **CI signs releases** (Ed25519 key as a GitHub secret, not an offline key),
+**ask, then install** (tray entry, then a confirmation window; no silent installs), **setup-installed copies
+only** (portable stays notify-only). Choices that differ from the sketch above:
+
+- Signature: Ed25519 over the exact bytes of `SHA256SUMS.txt`, `SHA256SUMS.txt.sig` = base64 of the raw 64 bytes,
+  made with `openssl pkeyutl -sign -rawin` in the publish job; verified with `ed25519-dalek` (`verify_strict`).
+  No minisign. An interop test uses a real OpenSSL signature (tests/fixtures/update).
+- Download URLs are built from the repository constant and the tag; `curl` follows at most 3 HTTPS redirects and
+  the final URL must still be GitHub (`allowed_url`). The signed list is fetched and verified **before** the
+  installer is downloaded, and the installer is hashed again right before it runs.
+- Installed vs portable: the Inno uninstall entry's `InstallLocation` (key `{AppId}_is1`) must equal the running
+  exe's folder. The installer script gained a `/aumupdate=1` switch that starts the new version afterwards.
+- No key compiled in (`PUBLIC_KEY_B64` empty) means updates are only announced: the feature fails closed.
+- Not done: Authenticode check of the installer (needs Windows code signing), delta updates, rollback beyond
+  "nothing changes if verification fails", portable and macOS in-place updates.
+- Verified by tests with a scripted `curl` (tampered list, wrong key, swapped installer, redirects, size caps,
+  no key) and on Windows against GitHub only after the first signed release exists (see README pending list).
 
 ## Implementation outline
 

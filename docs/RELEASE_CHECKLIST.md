@@ -80,6 +80,40 @@ Use for every release. Tick each box in the release PR.
 - Every job has a `timeout-minutes`, and `ci.yml` cancels an older run when a newer push arrives on the
   same branch. Neither helps a job still *waiting for a runner*, which only times out after 24 hours.
 
+## Update signing key
+
+Installed Windows copies update themselves only from a release whose `SHA256SUMS.txt` is signed with the
+project's Ed25519 key (`SHA256SUMS.txt.sig`, made by the publish job of `release.yml`). The private key is the
+GitHub secret `UPDATE_SIGNING_KEY`; the public key is compiled into the app (`PUBLIC_KEY_B64` in
+`crates/update/src/lib.rs`). Without either, releases still publish, installed copies only announce them.
+
+One-time setup (the private key never goes into the repository or into a chat):
+
+```bash
+openssl genpkey -algorithm ed25519 -out update-signing.pem
+openssl pkey -in update-signing.pem -pubout -outform DER | tail -c 32 | base64 -w0   # the public key
+```
+
+1. Repository Settings > Secrets and variables > Actions > New repository secret: name
+   `UPDATE_SIGNING_KEY`, value the whole contents of `update-signing.pem` (including the BEGIN/END lines).
+2. Put the printed base64 string in `PUBLIC_KEY_B64`, commit, release. Keep `update-signing.pem` in a password
+   manager or offline; delete the local copy once stored.
+3. After each release: the Releases page lists `SHA256SUMS.txt.sig` next to `SHA256SUMS.txt`
+   (the publish job warns "Updates not signed" if the secret is missing).
+
+Trade-off, stated plainly: the key lives in CI, so someone who controls the repository or its workflows can
+sign a malicious installer. It protects against a tampered or swapped release file, not against a compromised
+GitHub account. Moving signing to an offline key later only changes the release step, not the app.
+
+**Rotating or losing the key.** Installed copies trust only the compiled-in public key. To rotate: ship a
+release signed with the *old* key that contains the *new* public key, then switch the secret. If the key is
+lost or leaked, installed copies cannot be updated automatically to a new key: publish a release and ask
+users to install it by hand once (the app still announces it).
+
+**Testing an update end to end** needs two real releases (the running one and a newer one), for example 0.11.3
+installed and 0.11.4 published: run the setup of the older one, turn on Settings > Updates, click Check now,
+Install, and confirm the new version is running (`Settings` shows it) and `updates\` is gone.
+
 ## Website
 
 The project page is the static site in `site/` (`index.html`, `404.html`; plain HTML and CSS, no build step,

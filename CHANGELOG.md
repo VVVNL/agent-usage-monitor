@@ -4,6 +4,20 @@ All notable changes. Versions before 1.0 are betas.
 
 ## Unreleased
 
+- **Windows self-update (stage 2 of docs/research/auto-update.md).** A copy installed with the setup program
+  offers "Update available: X — install…" in the tray menu and a button in Settings > Updates. After you
+  confirm, the app downloads the signed checksum list, verifies its Ed25519 signature with the public key built
+  into the program, downloads the installer, checks its SHA-256 against the signed list, hashes it again just
+  before running it, runs it silently (no administrator rights, no reboot) and restarts. Nothing runs without
+  your click and a failed check changes nothing. The portable zip and macOS still open the release page.
+  **Fails closed:** with no key compiled in (`PUBLIC_KEY_B64` empty) or a release without
+  `SHA256SUMS.txt.sig`, updates are announced, never installed. The release workflow signs the checksum list
+  with the `UPDATE_SIGNING_KEY` secret; setup steps, trade-offs and rotation are in docs/RELEASE_CHECKLIST.md.
+  The installer script gained a `/aumupdate=1` switch (start the new version afterwards).
+- Fixed: `aum-platform` did not compile on its own for macOS (it relied on another crate enabling the Core
+  Animation feature); it now declares it.
+- Settings > Updates shows the update status and a Check now / Install / Open release page button.
+
 - **macOS: rounded widget corners.** The widget's content layer is clipped to a rounded rectangle and the window
   background is made clear, so the corners match the Windows look (they were square). Needs a Mac to see.
 - **Application icon** (macOS `AppIcon.icns`, Windows `app.ico` for the installer and shortcuts, `site/icon.png`):

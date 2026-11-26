@@ -24,6 +24,22 @@ pub fn monitors() -> Vec<Rect> {
     imp::monitors()
 }
 
+/// `AppId` of installer/agent-usage-monitor.iss (a test keeps the two in step). Inno Setup names the
+/// uninstall entry `{AppId}_is1`, which is how an installed copy is told from a portable one.
+pub const INSTALLER_APP_ID: &str = "{441C2F18-5B58-4B7C-A95D-68D18A524F2C}";
+
+/// The folder the setup program installed this app into, from its uninstall entry (Windows only;
+/// `None` for the portable zip, other systems, or when it cannot be read).
+pub fn installed_location() -> Option<String> {
+    imp::installed_location()
+}
+
+/// Start `program` with `args`, detached so it keeps running after this process exits (used to hand
+/// over to the installer during an update).
+pub fn spawn_detached(program: &std::path::Path, args: &[&str]) -> Result<(), String> {
+    imp::spawn_detached(program, args)
+}
+
 /// Is this app registered to start at login (per-user, no admin rights needed)?
 pub fn autostart_enabled() -> bool {
     imp::autostart_enabled()
@@ -100,6 +116,30 @@ mod imp {
             ));
         }
         TRUE
+    }
+
+    pub fn installed_location() -> Option<String> {
+        use winreg::RegKey;
+        use winreg::enums::HKEY_CURRENT_USER;
+        RegKey::predef(HKEY_CURRENT_USER)
+            .open_subkey(format!(
+                r"Software\Microsoft\Windows\CurrentVersion\Uninstall\{}_is1",
+                super::INSTALLER_APP_ID
+            ))
+            .and_then(|k| k.get_value::<String, _>("InstallLocation"))
+            .ok()
+    }
+
+    pub fn spawn_detached(program: &std::path::Path, args: &[&str]) -> Result<(), String> {
+        use std::os::windows::process::CommandExt;
+        const DETACHED_PROCESS: u32 = 0x0000_0008;
+        const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+        std::process::Command::new(program)
+            .args(args)
+            .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
+            .spawn()
+            .map(|_| ())
+            .map_err(|e| e.to_string())
     }
 
     const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
@@ -196,6 +236,16 @@ mod imp {
     pub fn monitors() -> Vec<Rect> {
         Vec::new()
     }
+    pub fn installed_location() -> Option<String> {
+        None
+    }
+    pub fn spawn_detached(program: &std::path::Path, args: &[&str]) -> Result<(), String> {
+        std::process::Command::new(program)
+            .args(args)
+            .spawn()
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
     pub fn autostart_enabled() -> bool {
         false
     }
@@ -219,9 +269,21 @@ mod tests {
         assert!(alpha_byte(50) > alpha_byte(40));
     }
 
+    #[test]
+    fn installer_app_id_matches_the_inno_script() {
+        // The script writes the braces doubled ("{{") because "{" starts a constant in Inno.
+        let iss = include_str!("../../../installer/agent-usage-monitor.iss");
+        let wanted = format!("AppId={{{}", INSTALLER_APP_ID);
+        assert!(
+            iss.contains(&wanted),
+            "AppId in the installer script is not {INSTALLER_APP_ID}"
+        );
+    }
+
     #[cfg(not(any(windows, target_os = "macos")))]
     #[test]
     fn unsupported_platform_is_a_noop() {
+        assert_eq!(installed_location(), None);
         assert!(!set_opacity(0, 80));
         assert!(monitors().is_empty());
         assert!(!autostart_enabled());

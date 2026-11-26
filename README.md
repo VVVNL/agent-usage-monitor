@@ -65,11 +65,17 @@ this app never opens `~/.codex/auth.json`.
 ## Update notifications (optional)
 
 The app can tell you when a newer version exists. It is **off until you say yes** (asked once, a few
-seconds after the first start; Settings > Updates changes it) and it **only notifies: nothing is downloaded
-or installed**. Once a day it asks GitHub for the list of releases through the system's `curl`; the tray
-menu's "Check for updates…" asks on demand. When a newer version exists the menu shows "Update available:
-X — open release page" and you get one notification. "Include beta versions" is on while every 0.x
-release is a pre-release. Details and exactly what is sent: [docs/PRIVACY.md](docs/PRIVACY.md#update-check-optional);
+seconds after the first start; Settings > Updates changes it). Once a day it asks GitHub for the list of
+releases through the system's `curl`; the tray menu's "Check for updates…" and Settings > Updates > "Check now"
+ask on demand. When a newer version exists the menu shows "Update available: X" and you get one
+notification. "Include beta versions" is on while every 0.x release is a pre-release.
+
+- **Windows, installed with the setup program:** the entry says "install…". After you confirm, the app
+  downloads the installer from the release, **verifies the project's signature on the release's checksum
+  list and the installer's SHA-256**, runs it silently (no administrator rights) and restarts. Nothing is
+  downloaded or run without your click; if verification fails, nothing runs. Needs the release to carry
+  `SHA256SUMS.txt.sig` and the program to have the project's public key built in.
+- **Portable zip and macOS:** the entry opens the release page and you install by hand. Details and exactly what is sent: [docs/PRIVACY.md](docs/PRIVACY.md#update-check-optional);
 design and later stages: [docs/research/auto-update.md](docs/research/auto-update.md).
 The check can only read public releases (a private fork would get "not found" and the check says so).
 
@@ -297,6 +303,11 @@ These were deliberately deferred and must be done before 1.0:
       attribution shown at the bottom of Settings. Confirm that is acceptable for an MIT project (the
       alternatives are GPLv3 for the whole app, or a commercial licence).
 - [ ] **Code signing** (optional, removes the SmartScreen warning).
+- [ ] **Self-update on Windows, end to end.** Built and unit-tested (scripted `curl`, OpenSSL-signed
+      fixtures); not yet run against a real signed release. Needs the update signing key set up
+      (docs/RELEASE_CHECKLIST.md, "Update signing key"), a release that carries `SHA256SUMS.txt.sig`, and a newer
+      release to update to: install the older setup, Settings > Updates > Check now > Install, and confirm the
+      new version runs and `updates\` is cleaned up.
 - [ ] **Update check: what the user sees.** Verified: the request, answer parser and decision against this
       project's real public release list (v0.11.0, including the ETag "unchanged" answer), the one-time
       question and its answers on Windows, and the failure path. Still to do when a release newer than the

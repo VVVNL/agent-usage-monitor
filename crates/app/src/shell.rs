@@ -24,7 +24,7 @@ use aum_providers::claude::activity::{ClaudeActivity, WslConfig};
 use aum_providers::codex::CodexProvider;
 use aum_providers::runner::SystemRunner;
 use aum_store::{LoadOutcome, Paths, Settings, Theme, WidgetPos};
-use aum_update::{UpdateState, Version};
+use aum_update::{Action, Available, InstallError, Staged, UpdateState, Version};
 use chrono::Utc;
 #[cfg(windows)]
 use slint::winit_030::winit::platform::windows::WindowExtWindows;
@@ -218,16 +218,53 @@ impl MenuState {
     }
 }
 
+/// What choosing "update" does for this copy of the program: install it (Windows copy installed with
+/// the setup program, and a signing key is built in) or open the release page.
+fn update_action(installed_by_setup: bool) -> Action {
+    aum_update::action(
+        cfg!(windows),
+        installed_by_setup,
+        aum_update::public_key().is_some(),
+    )
+}
+
+/// Was this copy installed by the setup program (as opposed to the portable zip)? Windows only: the
+/// installer records its folder in an uninstall entry and the running exe must live there.
+fn detect_installed_by_setup() -> bool {
+    #[cfg(windows)]
+    {
+        let Some(location) = aum_platform::installed_location() else {
+            return false;
+        };
+        std::env::current_exe()
+            .ok()
+            .and_then(|exe| exe.parent().map(|dir| aum_update::same_dir(&location, dir)))
+            .unwrap_or(false)
+    }
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
+
 /// Text and enabled state of the tray's update entry.
-fn update_menu_text(state: &UpdateState, s: &Settings, busy: bool) -> (String, bool) {
+fn update_menu_text(
+    state: &UpdateState,
+    s: &Settings,
+    busy: bool,
+    installed_by_setup: bool,
+) -> (String, bool) {
     if busy {
         return ("Checking for updates…".to_owned(), false);
     }
     match state.available(&current_version(), s.update.include_beta) {
-        Some(a) => (
-            format!("Update available: {} — open release page", a.version),
-            true,
-        ),
+        Some(a) => {
+            let how = match update_action(installed_by_setup) {
+                Action::Install => "install…",
+                Action::OpenPage => "open release page",
+            };
+            (format!("Update available: {} — {how}", a.version), true)
+        }
         None => ("Check for updates…".to_owned(), true),
     }
 }
@@ -502,6 +539,14 @@ struct App {
     /// What the update check remembers (`update.json`); nothing is downloaded or installed.
     update: UpdateState,
     update_busy: bool,
+    /// Installed with the setup program (Windows), so the update can be installed in place.
+    installed_by_setup: bool,
+    install_win: Option<UpdateInstallWindow>,
+    /// Downloading, checking or handing over to the installer.
+    installing: bool,
+    /// The install window was closed while downloading: do not run the installer afterwards.
+    install_cancelled: bool,
+    quit_timer: Timer,
     /// Hourly "is the daily check due?" timer, and the one-shot first check after start.
     update_timer: Timer,
     update_first: Timer,
@@ -648,7 +693,12 @@ impl App {
                     }
                 }
             } else {
-                let update = update_menu_text(&self.update, &self.settings, self.update_busy);
+                let update = update_menu_text(
+                    &self.update,
+                    &self.settings,
+                    self.update_busy,
+                    self.installed_by_setup,
+                );
                 let (menu, state) =
                     build_menu(&model, self.notice.as_deref(), &self.settings, &update);
                 tray.set_menu(Some(Box::new(menu)));
@@ -905,6 +955,10 @@ impl App {
             aum_platform::autostart_enabled(),
         )));
         win.set_version(env!("CARGO_PKG_VERSION").into());
+        let (status, button) = self.settings_update_ui();
+        win.set_update_status(status.into());
+        win.set_update_button_text(button.into());
+        win.on_update_clicked(|| with_app(App::on_update_clicked));
         win.set_show_wsl(cfg!(windows));
         win.on_changed(|f| {
             let form = from_slint_form(&f);
@@ -1018,7 +1072,12 @@ impl App {
 
     fn refresh_update_menu(&self) {
         if let Some(m) = &self.menu {
-            let (text, enabled) = update_menu_text(&self.update, &self.settings, self.update_busy);
+            let (text, enabled) = update_menu_text(
+                &self.update,
+                &self.settings,
+                self.update_busy,
+                self.installed_by_setup,
+            );
             m.update_item.set_text(text);
             m.update_item.set_enabled(enabled);
         }
@@ -1074,6 +1133,7 @@ impl App {
         }
         self.update_busy = true;
         self.refresh_update_menu();
+        self.refresh_settings_update();
         let mut state = self.update.clone();
         self.rt.spawn(async move {
             let report = aum_update::check(
@@ -1108,6 +1168,7 @@ impl App {
         }
         self.update.save(&self.paths);
         self.refresh_update_menu();
+        self.refresh_settings_update();
         if announce {
             self.tell_update_result(report);
         }
@@ -1116,7 +1177,7 @@ impl App {
     fn tell_update_result(&self, report: &aum_update::Report) {
         let msg = match (&report.available, &report.error) {
             (Some(a), _) => format!(
-                "Version {} is available. Choose \"Update available\" in the tray menu to open its page.",
+                "Version {} is available. Choose \"Update available\" in the tray menu.",
                 a.version
             ),
             (None, Some(e)) => format!("Couldn't check for updates: {e}."),
@@ -1167,19 +1228,201 @@ impl App {
         self.schedule_update_checks(yes);
     }
 
+    /// The tray entry and the Settings button do the same: check, or act on what was found.
+    fn on_update_clicked(&mut self) {
+        let found = self
+            .update
+            .available(&current_version(), self.settings.update.include_beta);
+        match found {
+            Some(a) => match update_action(self.installed_by_setup) {
+                Action::Install => self.open_install_window(&a),
+                Action::OpenPage => self.open_update_page(),
+            },
+            None => self.start_update_check(true),
+        }
+    }
+
+    /// Status line and button text for Settings > Updates.
+    fn settings_update_ui(&self) -> (String, String) {
+        if self.update_busy {
+            return ("Checking for updates…".to_owned(), "Checking…".to_owned());
+        }
+        let current = current_version();
+        match self
+            .update
+            .available(&current, self.settings.update.include_beta)
+        {
+            Some(a) => {
+                let button = match update_action(self.installed_by_setup) {
+                    Action::Install => format!("Install {}…", a.version),
+                    Action::OpenPage => "Open release page".to_owned(),
+                };
+                (
+                    format!("Version {} is available (you have {current}).", a.version),
+                    button,
+                )
+            }
+            None => {
+                let status = match (&self.update.last_error, self.update.last_check) {
+                    (Some(e), _) => format!("The last check failed: {e}."),
+                    (None, Some(_)) => format!("You're up to date (version {current})."),
+                    (None, None) => format!("Version {current}. Not checked yet."),
+                };
+                (status, "Check now".to_owned())
+            }
+        }
+    }
+
+    fn refresh_settings_update(&self) {
+        if let Some(w) = &self.settings_win {
+            let (status, button) = self.settings_update_ui();
+            w.set_update_status(status.into());
+            w.set_update_button_text(button.into());
+        }
+    }
+
+    // ----- installing an update (Windows, setup-installed copies; see docs/research/auto-update.md) -----
+
+    fn open_install_window(&mut self, found: &Available) {
+        if let Some(w) = &self.install_win {
+            let _ = w.show();
+            return;
+        }
+        let Ok(win) = UpdateInstallWindow::new() else {
+            return;
+        };
+        win.set_heading(format!("Install version {}?", found.version).into());
+        win.set_message(
+            "The installer is downloaded from this project's GitHub release and checked against \
+             the project's signature before it runs. The widget closes and starts again when it is \
+             done. Your settings are kept."
+                .into(),
+        );
+        win.on_install(|| with_app(App::begin_install));
+        win.on_dismiss(|| with_app(App::close_install_window));
+        win.on_open_page(|| with_app(|a| a.open_update_page()));
+        win.window().on_close_requested(|| {
+            let _ = slint::invoke_from_event_loop(|| with_app(App::close_install_window));
+            slint::CloseRequestResponse::HideWindow
+        });
+        let _ = win.show();
+        self.install_win = Some(win);
+    }
+
+    fn close_install_window(&mut self) {
+        if self.installing {
+            // Closed while downloading or handing over: let it finish but do not run the installer.
+            self.install_cancelled = true;
+        }
+        if let Some(w) = self.install_win.take() {
+            let _ = w.hide();
+        }
+    }
+
+    fn begin_install(&mut self) {
+        if self.installing {
+            return;
+        }
+        let Some(found) = self
+            .update
+            .available(&current_version(), self.settings.update.include_beta)
+        else {
+            return;
+        };
+        let plan = match aum_update::plan(&found) {
+            Ok(p) => p,
+            Err(e) => return self.install_failed(&e.to_string()),
+        };
+        self.installing = true;
+        self.install_cancelled = false;
+        if let Some(w) = &self.install_win {
+            w.set_busy(true);
+            w.set_heading(format!("Downloading version {}…", found.version).into());
+            w.set_message(
+                "Downloading the installer and checking its signature. This takes a few seconds."
+                    .into(),
+            );
+        }
+        let dir = self.paths.dir.join("updates");
+        let key = aum_update::public_key();
+        self.rt.spawn(async move {
+            let _ = std::fs::remove_dir_all(&dir); // leftovers of an earlier attempt
+            let result = aum_update::stage(
+                &SystemRunner,
+                &aum_update::fetch::curl_path(),
+                &plan,
+                key,
+                &dir,
+            )
+            .await;
+            let _ = slint::invoke_from_event_loop(move || {
+                with_app(|a| a.install_staged(result));
+            });
+        });
+    }
+
+    fn install_staged(&mut self, result: Result<Staged, InstallError>) {
+        self.installing = false;
+        if self.install_cancelled {
+            let _ = std::fs::remove_dir_all(self.paths.dir.join("updates"));
+            return;
+        }
+        let staged = match result {
+            Ok(s) => s,
+            Err(e) => {
+                diag(&format!("update install refused: {e}"));
+                return self.install_failed(&e.to_string());
+            }
+        };
+        // Verified a moment ago; hash again right before running it.
+        if let Err(e) = aum_update::install::recheck(&staged) {
+            diag(&format!("update install refused at the last check: {e}"));
+            return self.install_failed(&e.to_string());
+        }
+        match aum_platform::spawn_detached(&staged.setup_path, &aum_update::INSTALLER_ARGS) {
+            Ok(()) => {
+                diag("update: verified installer started, closing for the update");
+                if let Some(w) = &self.install_win {
+                    w.set_busy(true);
+                    w.set_heading("Installing…".into());
+                    w.set_message(
+                        "The widget closes now and starts again when the update is done.".into(),
+                    );
+                }
+                self.installing = true; // keeps the window from being treated as cancellable
+                self.quit_timer
+                    .start(TimerMode::SingleShot, Duration::from_millis(1500), || {
+                        let _ = slint::quit_event_loop();
+                    });
+            }
+            Err(e) => {
+                diag(&format!("update: could not start the installer: {e}"));
+                self.install_failed(&format!("could not start the installer ({e})"));
+            }
+        }
+    }
+
+    fn install_failed(&mut self, why: &str) {
+        self.installing = false;
+        if let Some(w) = &self.install_win {
+            w.set_busy(false);
+            w.set_done(true);
+            w.set_show_page_button(true);
+            w.set_heading("Couldn't update".into());
+            let mut why = why.to_owned();
+            if let Some(first) = why.get(..1) {
+                why.replace_range(..1, &first.to_uppercase()); // "the checksum…" to "The checksum…"
+            }
+            w.set_message(
+                format!("{why}.\n\nNothing was changed. You can install the new version by hand from the release page.")
+                    .into(),
+            );
+        }
+    }
+
     fn on_menu(&mut self, id: &str) {
         match id {
-            "update" => {
-                if self
-                    .update
-                    .available(&current_version(), self.settings.update.include_beta)
-                    .is_some()
-                {
-                    self.open_update_page();
-                } else {
-                    self.start_update_check(true);
-                }
-            }
+            "update" => self.on_update_clicked(),
             "refresh" => self.refresh(),
             "settings" | "interval:custom" => self.open_settings(),
             "open_dir" => {
@@ -1300,6 +1543,8 @@ fn run_inner() -> Result<(), String> {
     };
 
     let paths = Paths::system().map_err(|e| e.to_string())?;
+    // An installer left over from an update that already ran (or was abandoned) is not needed any more.
+    let _ = std::fs::remove_dir_all(paths.dir.join("updates"));
     let (settings, outcome) = aum_store::load_settings(&paths);
     let (cache, _) = aum_store::load_cache(&paths);
     if settings.launch_at_login {
@@ -1419,7 +1664,8 @@ fn run_inner() -> Result<(), String> {
         settings.poll_interval(),
     );
     let update_state = UpdateState::load(&paths);
-    let update_ui = update_menu_text(&update_state, &settings, false);
+    let installed_by_setup = detect_installed_by_setup();
+    let update_ui = update_menu_text(&update_state, &settings, false, installed_by_setup);
     let (menu, menu_state) = build_menu(&model, notice.as_deref(), &settings, &update_ui);
     let tray = TrayIconBuilder::new()
         .with_menu(Box::new(menu))
@@ -1455,6 +1701,11 @@ fn run_inner() -> Result<(), String> {
         display_poll: Timer::default(),
         update: update_state,
         update_busy: false,
+        installed_by_setup,
+        install_win: None,
+        installing: false,
+        install_cancelled: false,
+        quit_timer: Timer::default(),
         update_timer: Timer::default(),
         update_first: Timer::default(),
         prompt_timer: Timer::default(),

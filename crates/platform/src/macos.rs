@@ -69,6 +69,18 @@ fn launch_agent_path() -> Option<PathBuf> {
     )
 }
 
+pub fn installed_location() -> Option<String> {
+    None
+}
+
+pub fn spawn_detached(program: &Path, args: &[&str]) -> Result<(), String> {
+    Command::new(program)
+        .args(args)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
 pub fn autostart_enabled() -> bool {
     launch_agent_path().is_some_and(|p| p.is_file())
 }

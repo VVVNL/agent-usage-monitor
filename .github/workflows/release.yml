@@ -1,7 +1,8 @@
 name: Release
 
 # Builds every supported platform and publishes one GitHub release:
-#   Windows  tray app: installer + portable zip (also contains the `aum` command-line tool)
+#   Windows  tray app: installer + portable zip (also contains the `aum` command-line tool); the
+#            checksum list is signed (SHA256SUMS.txt.sig) so installed copies can update themselves
 #   macOS    tray app: universal (Apple Silicon + Intel) DMG   [skipped if SKIP_MACOS=true]
 #   Linux    `aum` command-line tool only (there is no Linux tray app yet)
 #
@@ -171,6 +172,27 @@ jobs:
           pattern: dist-*
           path: dist
           merge-multiple: true
+      # Sign the checksum list so installed copies can verify an update before running it. The secret
+      # holds an Ed25519 private key in PEM form (see docs/RELEASE_CHECKLIST.md, "Update signing key");
+      # the matching public key is compiled into the app (crates/update, PUBLIC_KEY_B64). Without the
+      # secret the release is still published, but installed copies only announce it.
+      - name: Sign SHA256SUMS.txt (update signature)
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          if [ -z "$UPDATE_SIGNING_KEY" ]; then
+            echo "::warning title=Updates not signed::The UPDATE_SIGNING_KEY secret is not set, so this release has no SHA256SUMS.txt.sig and installed copies will only announce it, not install it."
+            exit 0
+          fi
+          umask 077
+          key="$RUNNER_TEMP/update-key.pem"
+          printf '%s\n' "$UPDATE_SIGNING_KEY" > "$key"
+          openssl pkeyutl -sign -rawin -inkey "$key" -in dist/SHA256SUMS.txt -out "$RUNNER_TEMP/sums.sig"
+          base64 -w0 "$RUNNER_TEMP/sums.sig" > dist/SHA256SUMS.txt.sig
+          # Check our own signature before publishing it.
+          openssl pkey -in "$key" -pubout -out "$RUNNER_TEMP/pub.pem"
+          openssl pkeyutl -verify -rawin -pubin -inkey "$RUNNER_TEMP/pub.pem" -in dist/SHA256SUMS.txt -sigfile "$RUNNER_TEMP/sums.sig"
+          rm -f "$key" "$RUNNER_TEMP/sums.sig"
       - run: ls -l dist
       - uses: softprops/action-gh-release@v3
         with:

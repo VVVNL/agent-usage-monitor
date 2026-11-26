@@ -71,6 +71,22 @@ To see what a failing start says, run the app from Terminal:
   section of `settings.json`.
 - Every failure is written to `diagnostics.log` ("update check failed: …"); `update.json` holds the last one.
 
+### Installing an update (Windows)
+
+The entry only says "install…" on a copy installed with the setup program, in a release that carries a
+signature. Otherwise it opens the release page. If the install window reports a problem, **nothing was
+changed**; install from the release page by hand. What the messages mean:
+
+| Message | Meaning |
+|---|---|
+| "no update signing key is built into this version" | This build cannot verify updates (it was built without the project key) |
+| "the checksum list is not signed by the project's key" | The release's `SHA256SUMS.txt.sig` is missing, wrong or from another key. **Do not install it by hand without checking**; report it |
+| "the downloaded installer does not match its published checksum" | The installer differs from the signed list: a damaged download or a replaced file; try again later, report if it persists |
+| "download failed: …" | Network problem, `curl` missing, or the release has no such file |
+| "redirected away from GitHub" | The download was sent to a host outside GitHub; refused |
+
+Leftovers: the downloaded installer lives in `updates\` in the settings folder and is deleted at the next start.
+
 ## Starting over
 
 Quit from the tray menu, delete `%APPDATA%\AgentUsageMonitor`, start the app again.

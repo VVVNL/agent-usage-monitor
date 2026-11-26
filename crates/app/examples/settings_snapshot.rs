@@ -22,6 +22,8 @@ mod ui {
             .expect("backend");
         let w = SettingsWindow::new().unwrap();
         w.set_version("0.9.0".into());
+        w.set_update_status("Version 0.12.0 is available (you have 0.11.3).".into());
+        w.set_update_button_text("Install 0.12.0…".into());
         w.set_message("Couldn't change launch at login: example message".into());
         w.set_form(SettingsForm {
             claude_enabled: true,

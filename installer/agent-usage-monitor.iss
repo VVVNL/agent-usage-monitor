@@ -58,9 +58,19 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 
 [Run]
 Filename: "{app}\agent-usage-monitor.exe"; Description: "Start Agent Usage Monitor now"; Flags: nowait postinstall skipifsilent
+; The app updates itself by running this setup with /SILENT /aumupdate=1 and then exiting; start the new
+; version afterwards (a plain silent install by an administrator does not start it).
+Filename: "{app}\agent-usage-monitor.exe"; Flags: nowait runasoriginaluser; Check: IsSelfUpdate
 
 [UninstallRun]
 Filename: "{sys}\taskkill.exe"; Parameters: "/IM agent-usage-monitor.exe /F"; Flags: runhidden skipifdoesntexist; RunOnceId: "StopApp"
 
 ; Settings and cached values live in %APPDATA%\AgentUsageMonitor and are kept on uninstall
 ; (they contain no credentials). Delete that folder to remove them.
+
+[Code]
+// True when the app started this setup to update itself (see INSTALLER_ARGS in crates/update).
+function IsSelfUpdate: Boolean;
+begin
+  Result := ExpandConstant('{param:aumupdate|0}') = '1';
+end;

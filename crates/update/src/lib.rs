@@ -6,8 +6,11 @@
 //! docs/research/auto-update.md for the design and docs/PRIVACY.md for what leaves the computer.
 
 pub mod fetch;
+pub mod install;
 pub mod release;
 pub mod state;
+pub mod sums;
+pub mod verify;
 pub mod version;
 
 use std::path::Path;
@@ -17,9 +20,30 @@ use chrono::{DateTime, Utc};
 use aum_providers::runner::CommandRunner;
 
 pub use fetch::{FetchError, REPO};
+pub use install::{Action, InstallError, InstallPlan, Staged, action, plan, same_dir, stage};
 pub use release::SeenRelease;
 pub use state::{Available, UpdateState, release_page};
 pub use version::Version;
+
+/// The project's update-signing public key: base64 of the 32 raw Ed25519 bytes (see
+/// docs/RELEASE_CHECKLIST.md, "Update signing key"). **Empty until the key pair exists**: with no key
+/// built in, updates are only announced, never installed.
+pub const PUBLIC_KEY_B64: &str = "";
+
+/// The compiled-in public key, if there is a usable one.
+pub fn public_key() -> Option<[u8; 32]> {
+    verify::parse_public_key(PUBLIC_KEY_B64)
+}
+
+/// Arguments the app gives the Inno Setup installer when it updates itself: show progress but ask
+/// nothing, never reboot, close the running app, and (`/aumupdate=1`, read by the installer script)
+/// start the new version afterwards.
+pub const INSTALLER_ARGS: [&str; 4] = [
+    "/SILENT",
+    "/NORESTART",
+    "/CLOSEAPPLICATIONS",
+    "/aumupdate=1",
+];
 
 /// What a check found.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -273,5 +297,27 @@ mod tests {
                 error: None
             }
         );
+    }
+
+    #[test]
+    fn the_built_in_key_is_either_unset_or_a_valid_32_byte_key() {
+        // Empty (updates announced only) or exactly a 32-byte key; never a half-valid value that
+        // would silently disable verification differently from "no key".
+        assert!(
+            PUBLIC_KEY_B64.is_empty() || public_key().is_some(),
+            "PUBLIC_KEY_B64 is set but not a 32-byte key"
+        );
+        assert_eq!(public_key().is_some(), !PUBLIC_KEY_B64.is_empty());
+    }
+
+    #[test]
+    fn installer_arguments_are_silent_never_reboot_and_flag_an_update() {
+        assert!(INSTALLER_ARGS.contains(&"/NORESTART"));
+        assert!(
+            INSTALLER_ARGS.contains(&"/SILENT"),
+            "progress stays visible"
+        );
+        assert!(!INSTALLER_ARGS.contains(&"/VERYSILENT"));
+        assert!(INSTALLER_ARGS.contains(&"/aumupdate=1"));
     }
 }

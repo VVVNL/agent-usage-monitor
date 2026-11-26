@@ -28,6 +28,13 @@ from the release page:
 Get-FileHash .\agent-usage-monitor-<version>-setup.exe -Algorithm SHA256
 ```
 
+## Updating
+
+Turn on **Settings > Updates > Check for new versions once a day** (or click **Check now**). A copy installed
+with the setup program offers "Update available: X — install…"; confirm and it downloads, verifies and installs
+the new version by itself. The portable zip and macOS open the release page instead. See
+[PRIVACY.md](PRIVACY.md#installing-an-update-windows-setup-installed-copies-only) for exactly what happens.
+
 ## Option B: portable
 
 Download `agent-usage-monitor-<version>-windows-x64-portable.zip`, unzip anywhere, and run

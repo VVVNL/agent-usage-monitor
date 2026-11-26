@@ -5,7 +5,6 @@
 *.exe
 *.dmg
 *.msi
-SHA256SUMS*.txt
 
 # Runtime files the app writes into its data directory; never commit these
 *.corrupt
