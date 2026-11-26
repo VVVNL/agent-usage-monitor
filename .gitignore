@@ -42,3 +42,6 @@ desktop.ini
 
 # Deliberately tracked (do not ignore): Cargo.lock (CI uses --locked),
 # tests/fixtures/**, docs/THIRD_PARTY.md
+
+# Private keys: never commit (update signing key lives in the GitHub secret, not here)
+*.pem

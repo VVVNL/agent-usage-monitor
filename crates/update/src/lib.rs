@@ -28,7 +28,7 @@ pub use version::Version;
 /// The project's update-signing public key: base64 of the 32 raw Ed25519 bytes (see
 /// docs/RELEASE_CHECKLIST.md, "Update signing key"). **Empty until the key pair exists**: with no key
 /// built in, updates are only announced, never installed.
-pub const PUBLIC_KEY_B64: &str = "";
+pub const PUBLIC_KEY_B64: &str = "cqVsshgt0QLPtLyTmSASUm8LmPcmF4fEs1UC/qOQn+o=";
 
 /// The compiled-in public key, if there is a usable one.
 pub fn public_key() -> Option<[u8; 32]> {
