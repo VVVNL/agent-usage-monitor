@@ -1,6 +1,6 @@
 # Installing Agent Usage Monitor
 
-Windows 10 or 11 (64-bit) is the tested platform. A macOS build (beta, never run on a real Mac) and a
+Windows 10 or 11 (64-bit) is the tested platform. A macOS build (beta, seen running on a real Mac) and a
 Linux command-line tool are also published; see their sections below. No developer tools needed.
 
 ## Before you start
@@ -42,7 +42,7 @@ Download `agent-usage-monitor-<version>-windows-x64-portable.zip`, unzip anywher
 - Within about 30 seconds the tooltip and widget show your session and weekly limits.
 - Right-click the tray icon for **Settings…**, refresh, widget options, and **Quit**.
 
-## macOS (beta, untested on real Macs)
+## macOS (beta)
 
 1. Download `agent-usage-monitor-<version>-macos-universal.dmg` from the Releases page, open it and
    drag **Agent Usage Monitor** to Applications.

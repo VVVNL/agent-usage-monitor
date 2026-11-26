@@ -25,9 +25,34 @@ pub fn set_opacity(handle: isize, percent: u8) -> bool {
     true
 }
 
-/// Not implemented on macOS: the borderless window keeps square corners.
-pub fn round_corners(_handle: isize) -> bool {
-    false
+/// Corner radius of the widget in points (about what macOS windows use).
+const CORNER_RADIUS: f64 = 10.0;
+
+/// Round the widget's corners. The window is made non-opaque with a clear background (so the
+/// clipped corners show what is behind) and the content view's layer is clipped to a rounded
+/// rectangle. `handle` is the `NSView` pointer winit reports; main thread only.
+pub fn round_corners(handle: isize) -> bool {
+    use objc2_app_kit::{NSColor, NSView};
+    if handle == 0 {
+        return false;
+    }
+    // SAFETY: same contract as `set_opacity`: a live window's NSView, main thread.
+    let view: &NSView = unsafe { &*(handle as *const NSView) };
+    let Some(window) = view.window() else {
+        return false;
+    };
+    window.setOpaque(false);
+    window.setBackgroundColor(Some(&NSColor::clearColor()));
+    view.setWantsLayer(true);
+    let Some(layer) = view.layer() else {
+        return false;
+    };
+    layer.setCornerRadius(CORNER_RADIUS);
+    layer.setMasksToBounds(true);
+    // The window shadow follows the visible (now rounded) shape once it is recomputed.
+    window.setHasShadow(true);
+    window.invalidateShadow();
+    true
 }
 
 /// The shell asks winit for the monitor layout on macOS instead.

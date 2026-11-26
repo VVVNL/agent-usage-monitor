@@ -28,6 +28,8 @@ SolidCompression=yes
 WizardStyle=modern
 UninstallDisplayName=Agent Usage Monitor
 LicenseFile=..\LICENSE
+SetupIconFile=..\packaging\windows\app.ico
+UninstallDisplayIcon={app}\app.ico
 ; Replace a running copy instead of failing on a locked file.
 CloseApplications=force
 RestartApplications=no
@@ -38,14 +40,15 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut"; Flags: unchecked
 
 [Files]
 Source: "{#SourceExe}"; DestDir: "{app}"; DestName: "agent-usage-monitor.exe"; Flags: ignoreversion
+Source: "..\packaging\windows\app.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\docs\THIRD_PARTY.md"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 
 [Icons]
 ; The AppUserModelID lets Windows attribute notifications to this app by name.
-Name: "{userprograms}\Agent Usage Monitor"; Filename: "{app}\agent-usage-monitor.exe"; AppUserModelID: "AgentUsageMonitor.App"
-Name: "{userdesktop}\Agent Usage Monitor"; Filename: "{app}\agent-usage-monitor.exe"; Tasks: desktopicon
+Name: "{userprograms}\Agent Usage Monitor"; Filename: "{app}\agent-usage-monitor.exe"; IconFilename: "{app}\app.ico"; AppUserModelID: "AgentUsageMonitor.App"
+Name: "{userdesktop}\Agent Usage Monitor"; Filename: "{app}\agent-usage-monitor.exe"; IconFilename: "{app}\app.ico"; Tasks: desktopicon
 
 [Registry]
 ; Same per-user value the app itself manages from Settings > Launch at login.

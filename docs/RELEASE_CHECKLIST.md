@@ -40,7 +40,7 @@ Use for every release. Tick each box in the release PR.
 - [ ] Portable zip runs from a path with spaces.
 - [ ] `SHA256SUMS.txt` matches the downloaded files.
 
-## macOS (while macOS support is unproven, do all of this on a real Mac)
+## macOS (beta: confirm on a real Mac)
 
 - [ ] `SKIP_MACOS` is not set (see CI notes below), and the
       release workflow produced `agent-usage-monitor-<version>-macos-universal.dmg` and

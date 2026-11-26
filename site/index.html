@@ -4,12 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent Usage Monitor</title>
-<meta name="description" content="A small widget that shows how much of your Claude Code usage limits you have left and when they reset. Windows, with a macOS beta and a Linux command-line tool. Codex CLI support is experimental.">
+<meta name="description" content="A small widget that shows how much of your Claude Code and Codex usage limits you have left and when they reset. For Windows and macOS (beta), with a Linux command-line tool.">
 <meta name="color-scheme" content="light dark">
 <meta property="og:title" content="Agent Usage Monitor">
-<meta property="og:description" content="Know how much Claude Code you have left. A small, free widget for Windows, with a macOS beta.">
+<meta property="og:description" content="Know how much Claude Code and Codex you have left. A small, free widget for Windows and macOS.">
 <meta property="og:type" content="website">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231e1e22'/%3E%3Crect x='6' y='10' width='20' height='4' rx='2' fill='%234e4e56'/%3E%3Crect x='6' y='10' width='12' height='4' rx='2' fill='%2334c759'/%3E%3Crect x='6' y='18' width='20' height='4' rx='2' fill='%234e4e56'/%3E%3Crect x='6' y='18' width='16' height='4' rx='2' fill='%23ffb300'/%3E%3C/svg%3E">
+<link rel="icon" type="image/png" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
 <style>
 :root {
   --bg: #fbfbfd; --surface: #ffffff; --text: #1c1c1e; --muted: #5b5b66; --line: #e3e3ea;
@@ -29,7 +30,7 @@ a { color: var(--accent); }
 .wrap { max-width: 960px; margin: 0 auto; padding: 0 20px; }
 header .wrap { display: flex; align-items: center; gap: 16px; height: 60px; }
 .brand { font-weight: 700; display: flex; align-items: center; gap: 10px; }
-.brand svg { width: 22px; height: 22px; }
+.brand img { width: 24px; height: 24px; border-radius: 6px; }
 header nav { margin-left: auto; display: flex; gap: 16px; align-items: center; }
 header nav a { color: var(--muted); text-decoration: none; }
 .btn { display: inline-block; padding: 12px 22px; border-radius: 10px; font-weight: 600; text-decoration: none;
@@ -71,6 +72,7 @@ h2 { font-size: 30px; letter-spacing: -.01em; margin: 0 0 28px; text-align: cent
 .num { position: absolute; left: -40px; top: 50%; transform: translateY(-50%); width: 22px; height: 22px;
   border-radius: 50%; background: var(--accent); color: var(--accent-text); font-size: 13px; font-weight: 700;
   display: grid; place-items: center; }
+.divider { height: 1px; background: #34343b; margin: 12px 0 10px; }
 .compact { width: 240px; background: #1e1e22; color: #fff; border-radius: 12px; padding: 10px 12px;
   box-shadow: var(--shadow); font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
 .compact i { width: 8px; height: 8px; border-radius: 50%; background: #0a84ff; }
@@ -96,6 +98,13 @@ h2 { font-size: 30px; letter-spacing: -.01em; margin: 0 0 28px; text-align: cent
 code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em;
   background: var(--soft); border: 1px solid var(--line); padding: 1px 6px; border-radius: 6px; }
 .center { text-align: center; margin-top: 26px; }
+.ostabs { display: flex; gap: 8px; justify-content: center; margin: -10px 0 22px; }
+.ostabs button { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 999px;
+  padding: 6px 16px; font: inherit; font-size: 14px; cursor: pointer; }
+.ostabs button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+/* Without JavaScript every system's instructions show; with it, only the chosen one. */
+html[data-os="win"] .os:not(.os-win), html[data-os="mac"] .os:not(.os-mac), html[data-os="linux"] .os:not(.os-linux) { display: none; }
+html:not([data-os]) .ostabs { display: none; }
 
 .trust { max-width: 640px; margin: 0 auto; text-align: center; font-size: 18px; }
 .trust p { margin: 0 0 12px; }
@@ -127,7 +136,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
 <header>
   <div class="wrap">
     <span class="brand">
-      <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#1e1e22"/><rect x="6" y="10" width="20" height="4" rx="2" fill="#4e4e56"/><rect x="6" y="10" width="12" height="4" rx="2" fill="#34c759"/><rect x="6" y="18" width="20" height="4" rx="2" fill="#4e4e56"/><rect x="6" y="18" width="16" height="4" rx="2" fill="#ffb300"/></svg>
+      <img src="icon.png" alt="" width="24" height="24">
       Agent Usage Monitor
     </span>
     <nav aria-label="Main">
@@ -140,13 +149,13 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
 <main>
 <div class="hero">
   <div class="wrap">
-    <h1>Know how much Claude&nbsp;Code you have left.</h1>
-    <p class="lead">A small widget that sits on your screen and shows your Claude Code usage limits, when they reset, and whether Claude is still working.</p>
+    <h1>Know how much Claude&nbsp;Code and Codex you have&nbsp;left.</h1>
+    <p class="lead">A small widget that sits on your screen and shows your usage limits for Claude Code and Codex, when they reset, and whether Claude is still working.</p>
     <div class="cta">
-      <a class="btn primary" href="#start">Download for Windows</a>
+      <a class="btn primary" id="dl" href="https://github.com/VVVNL/agent-usage-monitor/releases">Download</a>
       <a class="btn" href="#explain">What it shows</a>
     </div>
-    <p class="fine">Free and open source. Not made by Anthropic or OpenAI.</p>
+    <p class="fine" id="dl-note">For Windows, macOS and Linux. Free and open source. Not made by Anthropic or OpenAI.</p>
   </div>
 </div>
 
@@ -155,7 +164,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
     <h2>What you&rsquo;re looking at</h2>
     <div class="explain">
       <div class="figure">
-        <div class="wd" role="img" aria-label="The widget: Session 35 percent, resets in 4 hours. Weekly 82 percent, resets in 4 days. 2 sessions working. Updated 1 minute ago.">
+        <div class="wd" role="img" aria-label="The widget: Claude Code session 35 percent, resets in 4 hours; weekly 82 percent, resets in 4 days; 2 sessions working. Codex CLI weekly 7 percent. Updated 1 minute ago.">
           <div class="head">
             <span class="title">Claude Code</span>
             <span class="ic" aria-hidden="true"><svg viewBox="0 0 14 14"><path d="M3 9L7 5L11 9"/></svg></span>
@@ -166,9 +175,13 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
           <div class="part bar"><span class="num" aria-hidden="true">2</span><div class="row"><b>Weekly</b><span>82%</span></div><div class="track"><i style="width:82%;background:#ffb300"></i></div><small>resets in 4d 12h</small></div>
           <div class="part chip"><span class="num" aria-hidden="true">3</span><i></i>2 working</div>
           <div class="part upd"><span class="num" aria-hidden="true">4</span>Updated 1 min ago</div>
+          <div class="divider"></div>
+          <div class="head"><span class="title">Codex CLI</span></div>
+          <div class="bar"><div class="row"><b>Weekly</b><span>7%</span></div><div class="track"><i style="width:7%;background:#34c759"></i></div><small>resets in 5d 4h</small></div>
+          <div class="upd">Updated 1 min ago</div>
         </div>
         <div class="compact" role="img" aria-label="Compact mode: Claude Code 35 percent and 82 percent, 2 working">Claude Code&nbsp; 35% · 82% <i></i><span>2</span></div>
-        <p class="cap">Prefer it tiny? Switch to compact mode.</p>
+        <p class="cap">Codex CLI appears below Claude Code when you turn it on. Prefer it tiny? Switch to compact mode.</p>
       </div>
       <ol class="legend">
         <li><span class="n">1</span><div><h3>Session limit</h3><p>How much of your current session allowance you&rsquo;ve used, and when it starts over.</p></div></li>
@@ -188,7 +201,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
         <h3>Your computer</h3>
         <ul class="ok-list">
           <li><b>Windows 10 and 11</b> <span class="pill ok">Tested</span><br><span>Tray icon and floating widget. Tested on Windows 11.</span></li>
-          <li><b>macOS</b> <span class="pill beta">Beta</span><br><span>Menu bar and floating widget. Built, but not yet tried on a real Mac.</span></li>
+          <li><b>macOS</b> <span class="pill beta">Beta</span><br><span>Menu bar and floating widget. Works on a real Mac; still beta, so expect rough edges.</span></li>
           <li><b>Linux</b> <span class="pill plain">Command line</span><br><span>No widget yet: the <code>aum</code> command prints your limits in a terminal.</span></li>
         </ul>
       </div>
@@ -196,7 +209,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
         <h3>Your coding agent</h3>
         <ul class="ok-list">
           <li><b>Claude Code</b> <span class="pill ok">Supported</span><br><span>Session and weekly limits, reset times, and which sessions are working or waiting for you.</span></li>
-          <li><b>Codex CLI</b> <span class="pill beta">Experimental</span><br><span>Session and weekly limits. Off until you turn it on in Settings, and not yet tested with a real Codex.</span></li>
+          <li><b>Codex CLI</b> <span class="pill beta">Beta</span><br><span>Session and weekly limits. Off until you turn it on in Settings. Seen working with a real Codex on a Mac; not yet tried on Windows.</span></li>
         </ul>
       </div>
     </div>
@@ -206,19 +219,30 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
 <section id="start">
   <div class="wrap">
     <h2>Get started in three steps</h2>
+    <div class="ostabs" role="group" aria-label="Choose your computer">
+      <button type="button" data-os="win">Windows</button>
+      <button type="button" data-os="mac">macOS</button>
+      <button type="button" data-os="linux">Linux</button>
+    </div>
     <ol class="steps">
-      <li><span class="n">1</span><div><h3>Have Claude Code ready</h3><p>Claude Code must be installed and signed in with a Claude subscription. If <code>claude</code> works in a terminal, you&rsquo;re set.</p></div></li>
-      <li><span class="n">2</span><div><h3>Download and run the installer</h3><p>Get <code>agent-usage-monitor-&hellip;-setup.exe</code> from the releases page. No admin rights needed. Windows may say &ldquo;unknown publisher&rdquo; because the app isn&rsquo;t signed yet: choose <em>More info</em>, then <em>Run anyway</em>. On a Mac, open the <code>.dmg</code>, drag the app to Applications, and right-click it and choose <em>Open</em> the first time.</p></div></li>
-      <li><span class="n">3</span><div><h3>Look at your screen</h3><p>The widget appears in the top-right corner and an icon appears in the system tray (on a Mac, in the menu bar). Drag the widget anywhere; right-click the tray icon for settings.</p></div></li>
+      <li><span class="n">1</span><div><h3>Have your coding agent ready</h3><p>Claude Code (and Codex, if you want it) must be installed and signed in with your subscription. If <code>claude</code> works in a terminal, you&rsquo;re set. Codex is switched on later, in Settings.</p></div></li>
+      <li><span class="n">2</span><div><h3>Download and install</h3>
+        <p class="os os-win">Get <code>agent-usage-monitor-&hellip;-setup.exe</code> from the releases page and run it. No admin rights needed. Windows may say &ldquo;unknown publisher&rdquo; because the app isn&rsquo;t signed yet: choose <em>More info</em>, then <em>Run anyway</em>.</p>
+        <p class="os os-mac">Get <code>agent-usage-monitor-&hellip;-macos-universal.dmg</code> (Apple silicon and Intel), open it and drag the app to Applications. The first time, right-click the app and choose <em>Open</em>. If that option is missing, try to open it once, then go to System Settings &rsaquo; Privacy &amp; Security and choose <em>Open Anyway</em>.</p>
+        <p class="os os-linux">There is no widget for Linux yet. Get <code>aum-&hellip;-linux-x64.tar.gz</code>, unpack it and run <code>./aum</code> to print your limits in the terminal (<code>--json</code> for scripts, <code>--codex</code> for Codex).</p></div></li>
+      <li><span class="n">3</span><div><h3>Look at your screen</h3>
+        <p class="os os-win">The widget appears in the top-right corner and an icon appears in the system tray. Drag the widget anywhere; right-click the tray icon for settings.</p>
+        <p class="os os-mac">The widget appears in the top-right corner and a gauge appears in the menu bar (there is no Dock icon). Drag the widget anywhere; click the menu bar item for settings, where you can also turn on Codex.</p>
+        <p class="os os-linux">Run it whenever you want a quick look, or from a status bar or script with <code>--json</code>.</p></div></li>
     </ol>
-    <p class="center"><a class="btn primary" href="https://github.com/VVVNL/agent-usage-monitor/releases">Go to the releases page</a></p>
+    <p class="center"><a class="btn primary" id="dl2" href="https://github.com/VVVNL/agent-usage-monitor/releases">Go to the releases page</a></p>
       </div>
 </section>
 
 <section id="privacy">
   <div class="wrap trust">
     <h2>Stays on your computer</h2>
-    <p>It asks Claude Code for the same numbers you&rsquo;d see by typing <code>/usage</code> (and Codex for its own, if you turn that on). It never reads your passwords or conversations, sends none of your data anywhere, and checking doesn&rsquo;t use up your allowance. The only thing it can ask the internet, if you allow it, is whether a newer version exists.</p>
+    <p>It asks Claude Code for the same numbers you&rsquo;d see by typing <code>/usage</code> (and asks Codex for its own, if you turn that on). It never reads your passwords or conversations, sends none of your data anywhere, and checking doesn&rsquo;t use up your allowance. The only thing it can ask the internet, if you allow it, is whether a newer version exists.</p>
     <p class="fine"><a href="https://github.com/VVVNL/agent-usage-monitor/blob/main/docs/PRIVACY.md">Privacy details</a></p>
   </div>
 </section>
@@ -230,5 +254,51 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
     <span><a href="https://github.com/VVVNL/agent-usage-monitor">Source code</a> &middot; <a href="https://github.com/VVVNL/agent-usage-monitor/issues">Report a problem</a></span>
   </div>
 </footer>
+<script>
+(function () {
+  var root = document.documentElement;
+  var releases = 'https://github.com/VVVNL/agent-usage-monitor/releases';
+  var label = { win: 'Download for Windows', mac: 'Download for macOS (beta)', linux: 'Download for Linux (command line)' };
+  var note = {
+    win: 'Windows 10 and 11. Also for macOS and Linux. Free and open source.',
+    mac: 'macOS 11 or later, Apple silicon and Intel. Beta: not yet tested on many Macs. Also for Windows and Linux.',
+    linux: 'Command-line tool only for now. Also for Windows and macOS with the widget.'
+  };
+  function detect() {
+    // ?os=win|mac|linux forces a system (handy for links such as ".../?os=mac").
+    var q = (/[?&]os=(win|mac|linux)\b/.exec(location.search) || [])[1];
+    if (q) return q;
+    var ua = navigator.userAgent || '';
+    if (/iPhone|iPad|iPod|Android/i.test(ua)) return null;                  // phones and tablets: no download for them
+    if (/Mac/i.test(ua) && navigator.maxTouchPoints > 1) return null;      // iPad asking for the desktop site
+    var p = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || ua;
+    if (/Win/i.test(p)) return 'win';
+    if (/Mac/i.test(p)) return 'mac';
+    if (/Linux|X11|CrOS/i.test(p + ' ' + ua)) return 'linux';
+    return null;
+  }
+  function apply(os) {
+    var dl = document.getElementById('dl'), n = document.getElementById('dl-note');
+    root.setAttribute('data-os', os);
+    dl.textContent = label[os]; dl.href = releases;
+    n.textContent = note[os];
+    var tabs = document.querySelectorAll('.ostabs button');
+    for (var i = 0; i < tabs.length; i++) tabs[i].setAttribute('aria-pressed', String(tabs[i].getAttribute('data-os') === os));
+  }
+  var os = detect();
+  if (os) {
+    apply(os);
+  } else {
+    // Unknown or a phone: keep the generic button and show the Windows steps with the tabs.
+    document.getElementById('dl-note').textContent = 'Download on a Windows or Mac computer (or Linux for the command line).';
+    root.setAttribute('data-os', 'win');
+    document.querySelector('.ostabs button[data-os="win"]').setAttribute('aria-pressed', 'true');
+  }
+  var tabs = document.querySelectorAll('.ostabs button');
+  for (var i = 0; i < tabs.length; i++) {
+    tabs[i].addEventListener('click', function () { apply(this.getAttribute('data-os')); });
+  }
+})();
+</script>
 </body>
 </html>

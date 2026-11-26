@@ -27,6 +27,7 @@ lipo -create -output "$APP/Contents/MacOS/agent-usage-monitor" \
   target/x86_64-apple-darwin/release/agent-usage-monitor
 sed "s/@VERSION@/$VERSION/g" packaging/macos/Info.plist.in > "$APP/Contents/Info.plist"
 cp LICENSE README.md "$APP/Contents/Resources/"
+cp packaging/macos/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 [ -f docs/THIRD_PARTY.md ] && cp docs/THIRD_PARTY.md "$APP/Contents/Resources/"
 
 IDENTITY="${CODESIGN_IDENTITY:--}"

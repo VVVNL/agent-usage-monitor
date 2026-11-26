@@ -76,6 +76,7 @@ jobs:
           {
             echo "== runner"; sw_vers; uname -m
             echo "== layout"; ls -la "$APP/Contents" "$APP/Contents/MacOS"
+            echo "== resources (icon)"; ls -la "$APP/Contents/Resources"; file "$APP/Contents/Resources/AppIcon.icns"
             echo "== lipo"; lipo -info "$BIN" 2>&1
             echo "== file"; file "$BIN"
             echo "== otool -L (first arch)"; otool -L "$BIN" 2>&1 | head -30

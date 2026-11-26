@@ -14,14 +14,14 @@ Website: <https://vvvnl.github.io/agent-usage-monitor/>.
 |---|---|---|---|
 | **What you get** | Tray icon, floating widget, settings, alerts | Menu bar item, floating widget, settings, alerts | No app yet: the `aum` command-line tool |
 | **Download** | Installer (per-user) or portable zip, both with `aum.exe` | Universal DMG | `aum` archive |
-| **Tested** | Yes, on a real Windows 11 machine (Windows 10 not tried) | **No: built and type-checked, never run on a Mac** | `aum` with Claude Code (in WSL Ubuntu) |
+| **Tested** | Yes, on a real Windows 11 machine (Windows 10 not tried) | **Beta.** Seen running on a real Mac (2026-11-26, from a screenshot): widget with Claude Code and Codex limits. Menu bar item, notifications, launch at login and a second display are not yet confirmed | `aum` with Claude Code (in WSL Ubuntu) |
 
 ### Providers
 
 | | Limits | Session activity | Status |
 |---|---|---|---|
 | **Claude Code** | Session, weekly, per-model weekly; plan and login state | Working / needs input / finished, plus the WSL bridge on Windows | Verified on Windows, and with `aum` on Linux |
-| **Codex CLI** | Session, weekly, extra metered buckets | Not available (Codex has no session-listing interface) | **Experimental, off by default** (Settings). Built from Codex's published schema; **never run against a real Codex** |
+| **Codex CLI** | Session, weekly, extra metered buckets | Not available (Codex has no session-listing interface) | **Beta, off by default** (Settings). Built from Codex's published schema. **Seen working against a real Codex on a Mac** (weekly limit and reset time shown); not yet compared with `/status`, and not yet tried on Windows |
 
 See [Pending verification](#pending-verification) for exactly what must be checked before 1.0.
 
@@ -138,12 +138,13 @@ out to keep it visible). Hover for the numbers; right-click for the menu.
 - `/usage` reflects the account, but its "what's contributing" section is a local estimate and is
   deliberately ignored.
 - API-key logins have no subscription limits and show as "not available" (Claude Code and Codex).
-- **Codex support is unproven against a real Codex.** Field names come from Codex's published JSON
-  schema (`GetAccountRateLimitsResponse`), and the fixtures in `tests/fixtures/codex` are derived from
-  it, not captured. The adapter retries once if the first answer has no windows (a documented quirk).
-- **macOS support is unproven on a real Mac.** See [macOS notes](#macos-notes).
+- **Codex support has been seen on one real Codex only** (a Mac, 2026-11-26). Field names come from
+  Codex's published JSON schema (`GetAccountRateLimitsResponse`), and the fixtures in `tests/fixtures/codex`
+  are derived from it, not captured. The adapter retries once if the first answer has no windows (a documented quirk).
+- **macOS support is beta.** See [macOS notes](#macos-notes).
 - The widget window is opaque with whole-window opacity and rounded corners from Windows 11 itself
-  (square on Windows 10); there is no per-pixel transparency.
+  (square on Windows 10); on macOS the corners are clipped by the window's layer and the window background
+  is clear. There is no per-pixel transparency.
 - Toasts are attributed to "Windows PowerShell" when running the portable build; the installer
   registers the app's own name.
 - Builds are **not code-signed yet**, so Windows SmartScreen warns on first run.
@@ -155,14 +156,18 @@ start on a Mac**: the single-instance lock used a relative file name, which macO
 the app is opened from Finder, so it failed with "file open or create error" and quit (found by running the
 released DMG on a macOS runner, `.github/workflows/macos-smoke.yml`). Fixed in 0.11.1 (the lock is now an
 absolute path in the temporary folder, a lock failure no longer stops the app, and a startup failure shows a
-notification). It still has not been run by a person on a real Mac beyond that smoke test:
+notification). 0.11.2 then fixed a second Mac-only problem (the newer `resets Nov 26 at 12:19am` wording).
+A user has since run it on a real Mac (screenshot 2026-11-26: widget showing Claude Code and Codex limits),
+and this version rounds the widget's corners and gives the app an icon. Still unconfirmed on a Mac: the menu bar
+item's look, notifications, launch at login and a second display:
 
 - It type-checks and passes Clippy for `aarch64-apple-darwin` and `x86_64-apple-darwin`, the text
-  helpers (notification script, LaunchAgent plist) are unit-tested on every OS, and the packaging
-  files are validated, but **no one has launched it on a Mac yet**.
+  helpers (notification script, LaunchAgent plist) are unit-tested on every OS, the packaging
+  files are validated, and CI starts the built app on a real macOS runner (`macos-smoke.yml`).
 - A menu bar item (the busiest session percentage next to the icon) and the same floating widget. The
-  app runs as an accessory app: no Dock icon. The widget corners are square (no rounded-corner call on
-  macOS yet).
+  app runs as an accessory app: no Dock icon. The widget corners are rounded (10 pt, clipped on the content
+  view's layer; the window background is clear). The app has an icon (`packaging/macos/AppIcon.icns`,
+  generated by `packaging/icon/make_icons.py`).
 - Notifications go through `osascript` (no signing needed); macOS attributes them to **Script Editor**
   and asks to allow them the first time. Launch at login writes
   `~/Library/LaunchAgents/io.github.agent-usage-monitor.plist`.
@@ -258,7 +263,7 @@ test method, so on-screen appearance was checked from toolkit-rendered images in
 | Widget layout with activity chips (full, light, compact with dot and count, idle-only) and the new Settings section | Rendered by the toolkit and inspected; two layout bugs found and fixed (clipped close button in compact mode, overlapping hint text) |
 | The `waiting` status and `waitingFor` reasons from a **real** Claude Code | **Not verified**: they come from the docs; the fixtures are labelled docs-derived |
 | Tray icon dot on a live taskbar; a toast actually appearing | **Not verified** (no screen access) |
-| macOS: compiles and passes Clippy; never run | **Not verified** |
+| macOS: compiles and passes Clippy; started on a macOS runner by CI (`macos-smoke.yml`); a user ran it on a real Mac and saw the widget with Claude Code and Codex limits | **Partly verified** (menu bar look, notifications, launch at login, second display not yet confirmed) |
 
 ### Codex and macOS (0.10)
 
@@ -276,10 +281,10 @@ test method, so on-screen appearance was checked from toolkit-rendered images in
 
 These were deliberately deferred and must be done before 1.0:
 
-- [ ] **Codex against a real Codex.** Install Codex CLI, sign in with ChatGPT, run
+- [ ] **Codex against a real Codex.** Seen working on a Mac (a screenshot). Still to do: run
       `aum --codex`, compare with `/status` in Codex, replace the schema-derived fixtures with real
-      captures (redacted), and enable Codex in Settings.
-- [ ] **A real Mac.** The smoke test on a macOS runner covers launch only. Install the DMG (right-click > Open), then check: menu bar text, widget placement
+      captures (redacted), and try it on Windows.
+- [ ] **A real Mac, the rest.** The widget works (screenshot) and CI covers launch. Install the DMG (right-click > Open) and confirm the rounded corners and the app icon in Finder, then check: menu bar text, widget placement
       on the main and a second display, Esc/R, opacity, always-on-top, notifications, launch at login,
       `claude` found when started from Finder, Quit leaves nothing running.
 - [ ] **The shipped builds.** CI built and published v0.11.0 (`windows-msvc` installer and portable zip,

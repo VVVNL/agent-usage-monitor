@@ -56,7 +56,7 @@ To see what a failing start says, run the app from Terminal:
 | **CLI not found** though `claude` works in Terminal | Finder-launched apps do not get your shell `PATH` | Set the path in Settings (`which claude` shows it) |
 | Keychain prompt on first refresh | Claude Code reads its own login from the Keychain | Choose **Always Allow** for `claude` |
 | Notifications say "Script Editor" | Notifications are sent through `osascript` | Expected; allow them in System Settings > Notifications |
-| Widget corners are square | No rounded-corner call on macOS yet | Known limitation |
+| Widget corners are square (**0.11.2 and earlier**) | The rounded-corner call did not exist on macOS yet | Install a newer release |
 
 ## Update check
 
