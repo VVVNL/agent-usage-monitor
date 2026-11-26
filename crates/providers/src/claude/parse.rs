@@ -55,9 +55,12 @@ pub fn parse_usage(text: &str, now: DateTime<Utc>) -> Result<Parsed, ProviderErr
         return Err(ProviderError::Parse(if unrecognized.is_empty() {
             "no usage limit lines found".to_owned()
         } else {
+            // Quote the first one: it holds only a percentage, a reset time and a time zone, and
+            // seeing it is the fastest way to learn what changed (another OS, locale or version).
             format!(
-                "{} limit line(s) in an unrecognised format",
-                unrecognized.len()
+                "{} limit line(s) in an unrecognised format, first: \"{}\"",
+                unrecognized.len(),
+                aum_core::sanitize_label(&unrecognized[0], 120)
             )
         }));
     }
@@ -318,5 +321,26 @@ mod tests {
         assert_eq!(a.subscription_type.as_deref(), Some("team"));
         assert!(a.login_expires_at.is_some());
         assert!(parse_auth_status("not json").is_err());
+    }
+
+    #[test]
+    fn unrecognised_line_is_quoted_in_the_error_so_it_can_be_diagnosed() {
+        // A limit line holds only a percentage, a reset time and a time zone: no personal data, so the
+        // first unreadable one is shown (control characters removed, length capped).
+        let text =
+            "Current session: 35% used · resets Nov 26, 4pm (PST)\nCurrent week: 9% used\u{7}";
+        let err = parse_usage(text, Utc::now()).unwrap_err().to_string();
+        assert!(
+            err.contains("2 limit line(s) in an unrecognised format"),
+            "{err}"
+        );
+        assert!(
+            err.contains("Current session: 35% used · resets Nov 26, 4pm (PST)"),
+            "{err}"
+        );
+        assert!(!err.contains('\u{7}'));
+        let long = format!("Current session: {}", "x".repeat(500));
+        let err = parse_usage(&long, Utc::now()).unwrap_err().to_string();
+        assert!(err.len() < 250, "capped: {}", err.len());
     }
 }

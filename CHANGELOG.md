@@ -2,6 +2,12 @@
 
 All notable changes. Versions before 1.0 are betas.
 
+## Unreleased
+
+- The "limit line(s) in an unrecognised format" error now quotes the first line it could not read (a limit
+  line holds only a percentage, a reset time and a time zone), so a format difference on another OS or
+  locale can be diagnosed from the error alone.
+
 ## 0.11.1 (beta)
 
 - **Fixed: the macOS app did not start at all.** `single-instance` treats its name as a *file path* on macOS;
