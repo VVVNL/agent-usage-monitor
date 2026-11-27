@@ -2,7 +2,7 @@
 
 All notable changes. Versions before 1.0 are betas.
 
-## Unreleased
+## 0.11.4
 
 - **Tray icon and macOS menu bar show Claude Code and Codex separately.** With both providers enabled the
   icon holds two gauges side by side (Claude Code left, Codex right), each with its own fill, colour and
