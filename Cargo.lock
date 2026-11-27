@@ -455,7 +455,7 @@ dependencies = [
 
 [[package]]
 name = "aum-app"
-version = "0.11.4"
+version = "0.11.5"
 dependencies = [
  "aum-collector",
  "aum-core",
@@ -473,7 +473,7 @@ dependencies = [
 
 [[package]]
 name = "aum-cli"
-version = "0.11.4"
+version = "0.11.5"
 dependencies = [
  "aum-collector",
  "aum-core",
@@ -485,7 +485,7 @@ dependencies = [
 
 [[package]]
 name = "aum-collector"
-version = "0.11.4"
+version = "0.11.5"
 dependencies = [
  "async-trait",
  "aum-core",
@@ -495,7 +495,7 @@ dependencies = [
 
 [[package]]
 name = "aum-core"
-version = "0.11.4"
+version = "0.11.5"
 dependencies = [
  "async-trait",
  "chrono",
@@ -505,7 +505,7 @@ dependencies = [
 
 [[package]]
 name = "aum-platform"
-version = "0.11.4"
+version = "0.11.5"
 dependencies = [
  "aum-store",
  "objc2 0.6.5",
@@ -518,7 +518,7 @@ dependencies = [
 
 [[package]]
 name = "aum-providers"
-version = "0.11.4"
+version = "0.11.5"
 dependencies = [
  "async-trait",
  "aum-core",
@@ -534,7 +534,7 @@ dependencies = [
 
 [[package]]
 name = "aum-store"
-version = "0.11.4"
+version = "0.11.5"
 dependencies = [
  "aum-core",
  "chrono",
@@ -547,7 +547,7 @@ dependencies = [
 
 [[package]]
 name = "aum-update"
-version = "0.11.4"
+version = "0.11.5"
 dependencies = [
  "async-trait",
  "aum-providers",

@@ -5,7 +5,7 @@ subscription limits you have used (session, weekly and any model-specific limit)
 which Claude Code sessions are working right now, with alerts before you run out. **Codex CLI** limits are
 supported experimentally.
 
-**Status: 0.11.4 beta.** Download from [GitHub Releases](https://github.com/VVVNL/agent-usage-monitor/releases).
+**Status: 0.11.5 beta.** Download from [GitHub Releases](https://github.com/VVVNL/agent-usage-monitor/releases).
 Website: <https://vvvnl.github.io/agent-usage-monitor/>.
 
 ### Platforms
@@ -347,7 +347,7 @@ These were deliberately deferred and must be done before 1.0:
 | 0.2 | Floating widget |
 | 0.9 | Settings, alerts, launch at login, installer, documentation |
 | 0.10 | Codex CLI provider, macOS support (both unproven on real hardware/software) |
-| **0.11 (this, 0.11.4)** | Session activity (working / needs input / finished) with the WSL bridge, Claude Code only; release builds for Windows, macOS and Linux (`aum`); optional update notifications; website |
+| **0.11 (this, 0.11.5)** | Session activity (working / needs input / finished) with the WSL bridge, Claude Code only; release builds for Windows, macOS and Linux (`aum`); optional update notifications; website |
 | 1.0 | After the pending verification above |
 | later | Code signing, Codex session activity (through Codex hooks), a Linux tray app |
 

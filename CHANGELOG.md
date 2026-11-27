@@ -2,7 +2,7 @@
 
 All notable changes. Versions before 1.0 are betas.
 
-## Unreleased
+## 0.11.5
 
 - **Pace estimate under each bar of the widget.** From a single reading (percentage and reset time) and the
   window's known length (session 5 h, weekly 7 d) the widget shows `Pace estimate: ~84% by reset` or, in red,
