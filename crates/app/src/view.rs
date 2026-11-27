@@ -17,13 +17,18 @@ const TOOLTIP_MAX: usize = 127;
 pub struct TrayModel {
     pub tooltip: String,
     /// Short text for the macOS menu bar, next to the icon: the busiest session percentage, or a
-    /// dash when there is no current value.
+    /// dash when there is no current value. With two providers, one value each separated by " · "
+    /// ("82% · 7%", Claude Code first), a dash standing in for a provider without a current value.
     pub title: String,
     /// Fill of the tray icon, 0..=100, or `None` when there is no usable value.
     pub icon_percent: Option<u8>,
     pub icon_level: Level,
     /// Dim the icon: data is stale or the provider is in error.
     pub icon_stale: bool,
+    /// One gauge per provider, in provider order (Claude Code, then Codex). The tray icon shows them
+    /// side by side when there are two; `icon_percent` and friends keep describing the single
+    /// "busiest provider" icon.
+    pub gauges: Vec<crate::icon::Gauge>,
     /// Session activity dot on the icon.
     pub badge: crate::icon::Badge,
     pub sections: Vec<Section>,
@@ -108,6 +113,7 @@ pub fn build_with_activity(
     let mut session: Option<u8> = None;
     let mut any_stale = false;
     let mut any_problem = false;
+    let mut gauges: Vec<crate::icon::Gauge> = Vec::new();
 
     for st in states {
         let stale = st.is_stale(now, poll_interval);
@@ -118,10 +124,16 @@ pub fn build_with_activity(
 
         let mut rows = Vec::new();
         let mut short = Vec::new();
+        // This provider's own gauge: its session limit, else its highest current limit.
+        let (mut own_session, mut own_worst): (Option<u8>, Option<u8>) = (None, None);
         if let Some(snap) = &st.snapshot {
             for w in &snap.windows {
                 rows.push(window_row(w, now));
                 if !w.is_expired(now) {
+                    own_worst = Some(own_worst.map_or(w.used_percent, |x| x.max(w.used_percent)));
+                    if w.kind == aum_core::WindowKind::Session {
+                        own_session = Some(w.used_percent);
+                    }
                     worst = Some(worst.map_or(w.used_percent, |x| x.max(w.used_percent)));
                     if w.kind == aum_core::WindowKind::Session {
                         // The tray icon follows the busiest provider.
@@ -141,6 +153,12 @@ pub fn build_with_activity(
         if rows.is_empty() {
             rows.push("No usage data available".into());
         }
+        let own = own_session.or(own_worst);
+        gauges.push(crate::icon::Gauge {
+            percent: own,
+            level: own.map_or(Level::Unknown, level_for),
+            stale: stale || (!ok && !checking),
+        });
 
         let updated = match &st.snapshot {
             None => "Never updated".to_owned(),
@@ -197,9 +215,22 @@ pub fn build_with_activity(
     }
 
     let icon_percent = session.or(worst);
+    let title = if gauges.len() >= 2 {
+        gauges
+            .iter()
+            .map(|g| {
+                g.percent
+                    .map_or_else(|| "–".to_owned(), |p| format!("{p}%"))
+            })
+            .collect::<Vec<_>>()
+            .join(" · ")
+    } else {
+        icon_percent.map_or_else(|| "–".to_owned(), |p| format!("{p}%"))
+    };
     TrayModel {
         tooltip,
-        title: icon_percent.map_or_else(|| "–".to_owned(), |p| format!("{p}%")),
+        title,
+        gauges,
         icon_percent,
         icon_level: icon_percent.map_or(Level::Unknown, level_for),
         icon_stale: any_stale || any_problem,
@@ -376,7 +407,7 @@ mod tests {
     }
 
     #[test]
-    fn menu_bar_title_follows_the_busiest_provider() {
+    fn menu_bar_title_separates_the_providers_while_the_summary_keeps_the_busiest() {
         let claude = state(
             vec![w(WindowKind::Session, 35, 244)],
             now(),
@@ -389,7 +420,9 @@ mod tests {
         );
         codex.provider = ProviderId::Codex;
         let m = build(&[claude, codex], now(), IV);
-        assert_eq!(m.title, "72%");
+        // Changed on request: one value per provider instead of only the busiest one.
+        assert_eq!(m.title, "35% · 72%");
+        // The single-icon summary still follows the busiest provider.
         assert_eq!(m.icon_percent, Some(72));
         assert!(m.tooltip.contains("Claude Code") && m.tooltip.contains("Codex CLI"));
     }
@@ -492,5 +525,109 @@ mod tests {
             m.sections[0].activity.as_deref(),
             Some("activity unavailable")
         );
+    }
+
+    // ----- one gauge per provider -----
+
+    fn state_for(
+        provider: ProviderId,
+        windows: Vec<UsageWindow>,
+        fetched: DateTime<Utc>,
+        status: ConnectionStatus,
+    ) -> ProviderState {
+        let mut st = state(windows, fetched, status);
+        st.provider = provider;
+        if let Some(snap) = st.snapshot.as_mut() {
+            snap.provider = provider;
+        }
+        st
+    }
+
+    fn claude_and_codex() -> Vec<ProviderState> {
+        vec![
+            state_for(
+                ProviderId::Claude,
+                vec![
+                    w(WindowKind::Session, 82, 100),
+                    w(WindowKind::Weekly, 40, 6000),
+                ],
+                now(),
+                ConnectionStatus::Connected,
+            ),
+            // Codex had only a weekly window in the real screenshot (no session window).
+            state_for(
+                ProviderId::Codex,
+                vec![w(WindowKind::Weekly, 7, 7000)],
+                now(),
+                ConnectionStatus::Connected,
+            ),
+        ]
+    }
+
+    #[test]
+    fn one_provider_gives_one_gauge() {
+        let m = build(&claude_and_codex()[..1], now(), IV);
+        assert_eq!(m.gauges.len(), 1);
+        assert_eq!(m.gauges[0].percent, Some(82));
+        assert_eq!(m.gauges[0].level, Level::Warn);
+        assert_eq!(m.title, "82%");
+    }
+
+    #[test]
+    fn two_providers_give_two_gauges_in_provider_order_with_their_own_values() {
+        let m = build(&claude_and_codex(), now(), IV);
+        assert_eq!(m.gauges.len(), 2);
+        assert_eq!(
+            (m.gauges[0].percent, m.gauges[0].level),
+            (Some(82), Level::Warn)
+        );
+        // No session window: the provider's highest current limit (weekly 7%) is used.
+        assert_eq!(
+            (m.gauges[1].percent, m.gauges[1].level),
+            (Some(7), Level::Ok)
+        );
+    }
+
+    #[test]
+    fn the_menu_bar_title_separates_the_providers() {
+        let m = build(&claude_and_codex(), now(), IV);
+        assert_eq!(m.title, "82% · 7%");
+        // A provider without a current value shows a dash in its place, not a made-up number.
+        let mut states = claude_and_codex();
+        states[1].snapshot = None;
+        states[1].status = ConnectionStatus::NotLoggedIn;
+        assert_eq!(build(&states, now(), IV).title, "82% · –");
+    }
+
+    #[test]
+    fn a_problem_or_stale_data_dims_only_that_providers_gauge() {
+        let mut states = claude_and_codex();
+        states[1].status = ConnectionStatus::Offline;
+        let m = build(&states, now(), IV);
+        assert!(!m.gauges[0].stale, "Claude is fine");
+        assert!(m.gauges[1].stale, "Codex is offline");
+        // The single-icon summary fields keep their old meaning (any provider's trouble).
+        assert!(m.icon_stale);
+    }
+
+    #[test]
+    fn an_expired_window_leaves_that_gauge_empty() {
+        let mut states = claude_and_codex();
+        states[1] = state_for(
+            ProviderId::Codex,
+            vec![w(WindowKind::Weekly, 90, -5)],
+            now() - CD::minutes(1),
+            ConnectionStatus::Connected,
+        );
+        let m = build(&states, now(), IV);
+        assert_eq!(m.gauges[1].percent, None);
+        assert_eq!(m.gauges[1].level, Level::Unknown);
+        assert_eq!(m.title, "82% · –");
+    }
+
+    #[test]
+    fn no_providers_gives_no_gauges() {
+        let m = build(&[], now(), IV);
+        assert!(m.gauges.is_empty());
     }
 }

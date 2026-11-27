@@ -393,12 +393,7 @@ fn build_menu(
 
 fn make_icon(model: &view::TrayModel) -> Icon {
     Icon::from_rgba(
-        icon::render_badged(
-            model.icon_percent,
-            model.icon_level,
-            model.icon_stale,
-            model.badge,
-        ),
+        icon::render_gauges(&model.gauges, model.badge),
         icon::SIZE,
         icon::SIZE,
     )

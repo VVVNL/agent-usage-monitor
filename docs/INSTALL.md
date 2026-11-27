@@ -43,7 +43,7 @@ Download `agent-usage-monitor-<version>-windows-x64-portable.zip`, unzip anywher
 
 ## First run
 
-- A gauge icon appears in the notification area. **Windows 11 hides new icons** under the `^`
+- A gauge icon appears in the notification area (two side-by-side gauges once Codex is switched on: Claude Code on the left, Codex on the right). **Windows 11 hides new icons** under the `^`
   arrow: open it and drag the icon onto the taskbar to keep it visible.
 - A small widget appears at the top-right of your main monitor. Drag it anywhere.
 - Within about 30 seconds the tooltip and widget show your session and weekly limits.

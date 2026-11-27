@@ -2,6 +2,15 @@
 
 All notable changes. Versions before 1.0 are betas.
 
+## Unreleased
+
+- **Tray icon and macOS menu bar show Claude Code and Codex separately.** With both providers enabled the
+  icon holds two gauges side by side (Claude Code left, Codex right), each with its own fill, colour and
+  stale dimming; one provider still gets the single wide gauge. A provider's gauge uses its session limit, or
+  its highest current limit when it has no session window (Codex often reports only a weekly one). The macOS
+  menu bar text separates the values too: `82% · 7%` (a dash where a provider has no current value).
+  New pure code and tests in `icon.rs` (`render_gauges`) and `view.rs` (`TrayModel.gauges`).
+
 ## 0.11.3
 
 - Rounded corners and an application icon on macOS; Windows installer and shortcuts use the new icon.
