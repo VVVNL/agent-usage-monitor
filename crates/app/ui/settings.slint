@@ -64,6 +64,7 @@ export component SettingsWindow inherits Window {
     callback update-clicked();
     callback changed(SettingsForm);
     callback test-notification();
+    callback copy-diagnostics();
 
     ScrollView {
         VerticalLayout {
@@ -299,6 +300,12 @@ export component SettingsWindow inherits Window {
                     toggled => { root.form.errors = self.checked; root.changed(root.form); }
                 }
                 Button { text: "Send a test notification"; clicked => { root.test-notification(); } }
+            }
+
+            Section {
+                heading: "Help";
+                Text { text: "Something not working? Copy a short report (versions, what each provider says, the lines it could not read, recent log lines) and paste it into a bug report. It contains no usage numbers, conversations, accounts or file paths, and goes nowhere unless you paste it."; font-size: 11px; height: 62px; wrap: word-wrap; opacity: 0.7; }
+                Button { text: "Copy diagnostics"; clicked => { root.copy-diagnostics(); } }
             }
 
             if root.message != "": Text { text: root.message; color: #e0a000; wrap: word-wrap; }

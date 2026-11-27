@@ -50,6 +50,75 @@ pub fn set_autostart(enabled: bool, exe: &std::path::Path) -> Result<(), String>
     imp::set_autostart(enabled, exe)
 }
 
+/// The bytes `clip.exe` needs for correct text: UTF-16 little endian with a byte-order mark.
+pub fn utf16le_with_bom(text: &str) -> Vec<u8> {
+    let mut out = vec![0xFF, 0xFE];
+    for unit in text.encode_utf16() {
+        out.extend_from_slice(&unit.to_le_bytes());
+    }
+    out
+}
+
+/// Put text on the system clipboard through the OS's own command (`clip.exe` on Windows,
+/// `pbcopy` on macOS), with no shell involved. Errors are returned, never panicked on.
+#[cfg(any(windows, target_os = "macos"))]
+pub fn copy_to_clipboard(text: &str) -> Result<(), String> {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+
+    #[cfg(windows)]
+    let (program, bytes) = {
+        let system32 = std::env::var_os("SystemRoot")
+            .map(|r| {
+                std::path::PathBuf::from(r)
+                    .join("System32")
+                    .join("clip.exe")
+            })
+            .filter(|p| p.is_file());
+        (
+            system32.unwrap_or_else(|| std::path::PathBuf::from("clip.exe")),
+            utf16le_with_bom(text),
+        )
+    };
+    #[cfg(target_os = "macos")]
+    let (program, bytes) = (
+        std::path::PathBuf::from("/usr/bin/pbcopy"),
+        text.as_bytes().to_vec(),
+    );
+
+    let mut cmd = Command::new(&program);
+    cmd.stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    // pbcopy assumes a legacy encoding unless told the text is UTF-8.
+    #[cfg(target_os = "macos")]
+    cmd.env("LC_ALL", "en_US.UTF-8");
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    }
+    let mut child = cmd.spawn().map_err(|e| e.to_string())?;
+    child
+        .stdin
+        .take()
+        .ok_or("no stdin")?
+        .write_all(&bytes)
+        .map_err(|e| e.to_string())?;
+    let status = child.wait().map_err(|e| e.to_string())?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("{} failed", program.display()))
+    }
+}
+
+/// No clipboard command is known on this platform.
+#[cfg(not(any(windows, target_os = "macos")))]
+pub fn copy_to_clipboard(_text: &str) -> Result<(), String> {
+    Err("copying to the clipboard is only supported on Windows and macOS".to_owned())
+}
+
 /// Show a native toast notification. Errors are returned, never panicked on.
 pub fn toast(title: &str, body: &str) -> Result<(), String> {
     imp::toast(title, body)
@@ -260,6 +329,31 @@ mod imp {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn clipboard_text_for_windows_is_utf16le_with_a_byte_order_mark() {
+        // clip.exe reads UTF-16 when it starts with a BOM; plain UTF-8 would garble non-ASCII text.
+        assert_eq!(utf16le_with_bom(""), vec![0xFF, 0xFE]);
+        assert_eq!(
+            utf16le_with_bom("A·"),
+            vec![0xFF, 0xFE, 0x41, 0x00, 0xB7, 0x00]
+        );
+        // A character outside the basic plane becomes a surrogate pair.
+        assert_eq!(
+            utf16le_with_bom("\u{1F600}"),
+            vec![0xFF, 0xFE, 0x3D, 0xD8, 0x00, 0xDE]
+        );
+        // Newlines pass through untouched (clip.exe keeps them).
+        assert_eq!(utf16le_with_bom("\n"), vec![0xFF, 0xFE, 0x0A, 0x00]);
+    }
+
+    /// Needs a desktop session (it replaces the clipboard): `cargo test -p aum-platform -- --ignored`.
+    /// Windows and macOS only; read the clipboard back to compare.
+    #[test]
+    #[ignore = "replaces the clipboard"]
+    fn copying_puts_the_text_on_the_clipboard() {
+        copy_to_clipboard("diagnostics test · \u{1F600}\nsecond line").unwrap();
+    }
 
     #[test]
     fn alpha_mapping() {

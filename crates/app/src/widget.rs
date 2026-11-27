@@ -2,6 +2,7 @@
 
 use std::time::Duration;
 
+use aum_core::forecast::{Forecast, forecast};
 use aum_core::{ConnectionStatus, ProviderState, WindowKind, format_countdown};
 use chrono::{DateTime, Utc};
 
@@ -21,6 +22,11 @@ pub struct BarRow {
     pub level: Level,
     /// "resets in 4h 04m" or "reset passed, refreshing".
     pub detail: String,
+    /// The pace estimate ("Pace estimate: runs out in ~1h 44m"), or empty when none applies: too early
+    /// in the window, the value is stale or in error, the limit is reached, or the window's length is
+    /// unknown. See `aum_core::forecast`.
+    pub forecast: String,
+    pub forecast_level: Level,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -74,8 +80,30 @@ pub fn build_with_activity(
     }
 }
 
+/// Words and colour for a forecast. Red only when the limit would be reached before the reset; amber
+/// when the projection ends close to the limit.
+fn forecast_text(f: Option<Forecast>) -> (String, Level) {
+    match f {
+        Some(Forecast::RunsOut { in_ }) => (
+            format!("Pace estimate: runs out in ~{}", format_countdown(in_)),
+            Level::Critical,
+        ),
+        Some(Forecast::OnTrack { projected_percent }) => (
+            format!("Pace estimate: ~{projected_percent}% by reset"),
+            if projected_percent >= 85 {
+                Level::Warn
+            } else {
+                Level::Ok
+            },
+        ),
+        Some(Forecast::TooEarly) | None => (String::new(), Level::Unknown),
+    }
+}
+
 fn section(st: &ProviderState, now: DateTime<Utc>, interval: Duration) -> WidgetSection {
     let stale = st.is_stale(now, interval);
+    // A projection from old numbers would mislead (the percentage no longer matches the clock).
+    let can_forecast = !stale && st.status == ConnectionStatus::Connected;
     let mut bars = Vec::new();
     let mut compact_values = Vec::new();
 
@@ -87,11 +115,18 @@ fn section(st: &ProviderState, now: DateTime<Utc>, interval: Duration) -> Widget
                 Some(d) => format!("resets in {}", format_countdown(d)),
                 None => "reset passed, refreshing".to_owned(),
             };
+            let (forecast, forecast_level) = if can_forecast {
+                forecast_text(forecast(w, now))
+            } else {
+                (String::new(), Level::Unknown)
+            };
             bars.push(BarRow {
                 label: w.kind.label(),
                 percent,
                 level: percent.map_or(Level::Unknown, level_for),
                 detail,
+                forecast,
+                forecast_level,
             });
             // Compact mode shows only the two headline limits.
             if matches!(w.kind, WindowKind::Session | WindowKind::Weekly) {
@@ -306,5 +341,110 @@ mod tests {
             s.compact, "Claude Code  35%",
             "compact text itself is unchanged; the dot is drawn by the UI"
         );
+    }
+
+    // ----- pace forecast line under each bar -----
+
+    #[test]
+    fn heavy_early_use_shows_when_the_limit_would_run_out() {
+        let st = state(
+            vec![w(WindowKind::Session, 35, 244)],
+            ConnectionStatus::Connected,
+            0,
+        );
+        let b = &build(&[st], now(), IV).sections[0].bars[0];
+        assert_eq!(b.forecast, "Pace estimate: runs out in ~1h 44m");
+        assert_eq!(b.forecast_level, Level::Critical);
+    }
+
+    #[test]
+    fn steady_use_shows_the_projected_percent_and_warns_when_it_is_close() {
+        // Weekly 34% with 100 h left: 40.5% of the week elapsed, so about 84% by the reset.
+        let st = state(
+            vec![w(WindowKind::Weekly, 34, 6000)],
+            ConnectionStatus::Connected,
+            0,
+        );
+        let b = &build(&[st], now(), IV).sections[0].bars[0];
+        assert_eq!(b.forecast, "Pace estimate: ~84% by reset");
+        assert_eq!(b.forecast_level, Level::Ok);
+        // 40% used, same time left: about 99%, which is close enough to warn.
+        let st = state(
+            vec![w(WindowKind::Weekly, 40, 6000)],
+            ConnectionStatus::Connected,
+            0,
+        );
+        let b = &build(&[st], now(), IV).sections[0].bars[0];
+        assert_eq!(b.forecast, "Pace estimate: ~99% by reset");
+        assert_eq!(b.forecast_level, Level::Warn);
+    }
+
+    #[test]
+    fn no_forecast_line_when_there_is_nothing_sound_to_say() {
+        let empty =
+            |st: ProviderState| build(&[st], now(), IV).sections[0].bars[0].forecast.clone();
+        // Just opened.
+        let fresh = state(
+            vec![w(WindowKind::Session, 3, 295)],
+            ConnectionStatus::Connected,
+            0,
+        );
+        assert_eq!(empty(fresh), "");
+        // Window rolled over: the value is not current, so no projection from it.
+        let rolled = state(
+            vec![w(WindowKind::Session, 98, -3)],
+            ConnectionStatus::Connected,
+            0,
+        );
+        assert_eq!(empty(rolled), "");
+        // Limit already reached.
+        let full = state(
+            vec![w(WindowKind::Session, 100, 60)],
+            ConnectionStatus::Connected,
+            0,
+        );
+        assert_eq!(empty(full), "");
+        // A window with an unknown length.
+        let odd = state(
+            vec![w(WindowKind::Named("3-day".into()), 40, 600)],
+            ConnectionStatus::Connected,
+            0,
+        );
+        assert_eq!(empty(odd), "");
+    }
+
+    #[test]
+    fn stale_or_failing_data_is_not_extrapolated() {
+        // 30 minutes old: the percentage no longer matches the clock, so a projection would mislead.
+        let stale = state(
+            vec![w(WindowKind::Session, 35, 244)],
+            ConnectionStatus::Connected,
+            30,
+        );
+        assert_eq!(build(&[stale], now(), IV).sections[0].bars[0].forecast, "");
+        let offline = state(
+            vec![w(WindowKind::Session, 35, 244)],
+            ConnectionStatus::Offline,
+            0,
+        );
+        assert_eq!(
+            build(&[offline], now(), IV).sections[0].bars[0].forecast,
+            ""
+        );
+    }
+
+    #[test]
+    fn the_forecast_does_not_change_the_existing_detail_or_compact_text() {
+        let st = state(
+            vec![
+                w(WindowKind::Session, 35, 244),
+                w(WindowKind::Weekly, 34, 6000),
+            ],
+            ConnectionStatus::Connected,
+            1,
+        );
+        let s = &build(&[st], now(), IV).sections[0];
+        assert_eq!(s.bars[0].detail, "resets in 4h 04m");
+        assert_eq!(s.compact, "Claude Code  35% · 34%");
     }
 }

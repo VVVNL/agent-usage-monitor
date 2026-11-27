@@ -2,6 +2,7 @@
 //! Everything here is unit-tested on any OS; only `main.rs` touches Windows.
 
 pub mod activity;
+pub mod diagnostics;
 pub mod display;
 pub mod form;
 pub mod icon;

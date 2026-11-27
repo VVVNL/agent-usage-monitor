@@ -104,5 +104,8 @@ Run them yourself to compare. If `claude -p "/usage"` shows no limits, neither w
 
 ## Reporting a problem
 
-Open an issue with: Windows version, Claude Code version (`claude --version`), what you saw, and the
-last lines of `diagnostics.log`. Do not paste `auth status` output; it contains your email.
+Open an issue and paste the report from **Settings > Help > Copy diagnostics**: it holds the app, Claude Code
+and Codex versions, what each provider says, the limit lines it could not read and the recent log lines,
+with your home folder, user names and e-mail addresses removed (see
+[docs/PRIVACY.md](PRIVACY.md#copy-diagnostics); read it before pasting). Add what you saw and your operating
+system version. Do not paste `auth status` output; it contains your email.

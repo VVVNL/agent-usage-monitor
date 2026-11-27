@@ -29,6 +29,9 @@ export struct BarData {
     // 0 ok, 1 warn, 2 critical, 3 unknown
     level: int,
     detail: string,
+    // Pace estimate line; empty = none. forecast-level: 0 ok, 1 warn, 2 critical.
+    forecast: string,
+    forecast-level: int,
 }
 
 export struct ChipData {
@@ -127,6 +130,7 @@ component Bar inherits VerticalLayout {
         }
     }
     Text { text: d.detail; color: Pal.subtext; font-size: 10px; }
+    if d.forecast != "": Text { text: d.forecast; color: d.forecast-level == 2 ? Pal.crit : d.forecast-level == 1 ? Pal.warn : Pal.subtext; font-size: 10px; }
 }
 
 export component Widget inherits Window {

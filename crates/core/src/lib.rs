@@ -3,6 +3,8 @@
 //! Design rule: a value is either present with a [`Provenance`], or it is
 //! absent. Nothing is ever invented to fill a gap.
 
+pub mod forecast;
+
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};

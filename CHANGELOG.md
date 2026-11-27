@@ -2,6 +2,18 @@
 
 All notable changes. Versions before 1.0 are betas.
 
+## Unreleased
+
+- **Pace estimate under each bar of the widget.** From a single reading (percentage and reset time) and the
+  window's known length (session 5 h, weekly 7 d) the widget shows `Pace estimate: ~84% by reset` or, in red,
+  `Pace estimate: runs out in ~1h 44m`. Stateless, so it reads the same on every computer for the same account;
+  an estimate, labelled as one, and hidden early in a window, for stale or failing data, at 100%, or for windows
+  of unknown length. New `aum_core::forecast` with tests.
+- **Copy diagnostics** (Settings > Help): a redacted report (versions, provider status, unreadable limit lines,
+  settings summary, recent log) copied to the clipboard on click, or saved as `diagnostics-report.txt` when
+  there is no clipboard. No usage numbers, conversations, accounts or paths; see docs/PRIVACY.md. New
+  `aum_app::diagnostics` and `aum_platform::copy_to_clipboard` (`clip.exe` as UTF-16 on Windows, `pbcopy` on macOS).
+
 ## 0.11.4
 
 - **Tray icon and macOS menu bar show Claude Code and Codex separately.** With both providers enabled the

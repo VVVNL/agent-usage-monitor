@@ -54,6 +54,23 @@ code-signed.
 **Reporting a vulnerability.** Please open a private security advisory on the repository rather than a
 public issue.
 
+## Copy diagnostics
+
+Settings > Help > **Copy diagnostics** builds a short text report for bug reports. Nothing is sent anywhere:
+it is built on your computer, put on the clipboard only when you click, and (if the clipboard is not
+available) saved as `diagnostics-report.txt` in the settings folder.
+
+- **Included:** the app version and operating system, the version line printed by `claude --version` and
+  `codex --version`, each provider's connection status and how many limit windows were read, the first three
+  limit lines the parser could not read (a percentage, a reset time and a time zone), which settings are on,
+  how many WSL distributions are named, whether custom CLI paths are set, the update-check result, and the
+  last 15 lines of the app's own `diagnostics.log`.
+- **Never included:** usage numbers, conversations, accounts or e-mail addresses, project names, session
+  names, file paths to your files, the names of your WSL distributions, or the value of any custom path.
+- **Scrubbed anyway:** your home folder becomes `~`, user names inside profile paths become `<user>`,
+  e-mail-like text becomes `<email>`, control characters are removed, each line is capped and the whole
+  report is cut at 8 KB. Read it before you paste it.
+
 ## Update check (optional)
 
 The only network request the app itself can make. **Off until you say yes**: about 20 seconds after the

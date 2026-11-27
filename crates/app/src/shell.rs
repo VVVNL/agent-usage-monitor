@@ -10,6 +10,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use aum_app::activity::{self, ActivityView, Tracker};
+use aum_app::diagnostics;
 use aum_app::display::LayoutWatch;
 use aum_app::form::{self, Form};
 use aum_app::widget::{self, WidgetModel};
@@ -22,7 +23,7 @@ use aum_core::{Provider, ProviderState};
 use aum_providers::claude::ClaudeProvider;
 use aum_providers::claude::activity::{ClaudeActivity, WslConfig};
 use aum_providers::codex::CodexProvider;
-use aum_providers::runner::SystemRunner;
+use aum_providers::runner::{CommandRunner, SystemRunner, resolve_cli};
 use aum_store::{LoadOutcome, Paths, Settings, Theme, WidgetPos};
 use aum_update::{Action, Available, InstallError, Staged, UpdateState, Version};
 use chrono::Utc;
@@ -269,6 +270,17 @@ fn update_menu_text(
     }
 }
 
+/// First line of `<program> --version`, or `None` when it cannot be run.
+async fn cli_version(name: &str, custom: Option<&str>) -> Option<String> {
+    let program = resolve_cli(name, custom.map(std::path::Path::new));
+    let out = SystemRunner
+        .run(&program, &["--version"], Duration::from_secs(10))
+        .await
+        .ok()?;
+    let line = out.stdout.lines().next()?.trim().to_owned();
+    (out.success && !line.is_empty()).then(|| aum_core::sanitize_label(&line, 80))
+}
+
 fn current_version() -> Version {
     Version::parse(env!("CARGO_PKG_VERSION")).expect("the crate version is a version")
 }
@@ -432,6 +444,12 @@ fn to_section_data(m: &WidgetModel) -> Vec<SectionData> {
                             icon::Level::Unknown => 3,
                         },
                         detail: b.detail.as_str().into(),
+                        forecast: b.forecast.as_str().into(),
+                        forecast_level: match b.forecast_level {
+                            icon::Level::Critical => 2,
+                            icon::Level::Warn => 1,
+                            _ => 0,
+                        },
                     })
                     .collect::<Vec<_>>(),
             )),
@@ -959,6 +977,7 @@ impl App {
             let form = from_slint_form(&f);
             with_app(|a| a.apply_form(form));
         });
+        win.on_copy_diagnostics(|| with_app(|a| a.copy_diagnostics()));
         win.on_test_notification(|| {
             std::thread::spawn(|| {
                 let result =
@@ -981,6 +1000,117 @@ impl App {
         });
         let _ = win.show();
         self.settings_win = Some(win);
+    }
+
+    /// "Copy diagnostics": gather what the app knows, ask the CLIs for their versions in the
+    /// background, scrub it (see `aum_app::diagnostics`) and put it on the clipboard.
+    fn copy_diagnostics(&mut self) {
+        self.set_settings_message("Collecting diagnostics…".to_owned());
+        let now = Utc::now();
+        let interval = self.settings.poll_interval();
+        let states = self.states();
+        let settings = self.settings.clone();
+        let update = self.update.clone();
+        let dir = self.paths.dir.clone();
+        self.rt.spawn(async move {
+            let claude_v = cli_version("claude", settings.claude_cli_path.as_deref()).await;
+            let codex_v = if settings.codex_enabled {
+                cli_version("codex", settings.codex_cli_path.as_deref()).await
+            } else {
+                None
+            };
+            let provider = |id: ProviderId, enabled: bool, version: Option<String>| {
+                let st = states.iter().find(|s| s.provider == id);
+                diagnostics::ProviderInfo {
+                    name: id.display_name().to_owned(),
+                    enabled,
+                    status: st
+                        .map_or_else(|| "Unknown".to_owned(), |s| view::status_text(&s.status)),
+                    updated: st.and_then(|s| s.snapshot.as_ref()).map_or_else(
+                        || "never read".to_owned(),
+                        |snap| {
+                            let age = (now - snap.fetched_at).to_std().unwrap_or_default();
+                            let stale = st.is_some_and(|s| s.is_stale(now, interval));
+                            format!(
+                                "last read {} ago{}",
+                                view::ago(age),
+                                if stale { " (stale)" } else { "" }
+                            )
+                        },
+                    ),
+                    windows_read: st
+                        .and_then(|s| s.snapshot.as_ref())
+                        .map_or(0, |snap| snap.windows.len()),
+                    cli_version: version,
+                    unrecognized: st
+                        .and_then(|s| s.snapshot.as_ref())
+                        .map(|snap| snap.unrecognized.clone())
+                        .unwrap_or_default(),
+                }
+            };
+            let log_tail = std::fs::read(dir.join("diagnostics.log"))
+                .map(|b| {
+                    let from = b.len().saturating_sub(4096);
+                    String::from_utf8_lossy(&b[from..]).into_owned()
+                })
+                .unwrap_or_default();
+            let input = diagnostics::Input {
+                app_version: env!("CARGO_PKG_VERSION").to_owned(),
+                os: format!("{} {}", std::env::consts::OS, std::env::consts::ARCH),
+                created_utc: now.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+                providers: vec![
+                    provider(ProviderId::Claude, settings.claude_enabled, claude_v),
+                    provider(ProviderId::Codex, settings.codex_enabled, codex_v),
+                ],
+                settings: diagnostics::SettingsInfo {
+                    refresh_minutes: settings.poll_interval().as_secs() / 60,
+                    launch_at_login: settings.launch_at_login,
+                    widget_visible: settings.widget_visible,
+                    widget_compact: settings.widget_compact,
+                    widget_always_on_top: settings.widget_always_on_top,
+                    activity_enabled: settings.activity.enabled,
+                    wsl_distro_count: settings.activity.wsl_distros.len(),
+                    update_check_daily: settings.update.check_daily,
+                    update_include_beta: settings.update.include_beta,
+                    custom_claude_path: settings.claude_cli_path.is_some(),
+                    custom_codex_path: settings.codex_cli_path.is_some(),
+                },
+                update_status: match (&update.last_check, &update.last_error) {
+                    (None, _) => "never checked".to_owned(),
+                    (Some(t), None) => format!(
+                        "last check {}, ok",
+                        t.to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
+                    ),
+                    (Some(t), Some(e)) => format!(
+                        "last check {}, failed: {e}",
+                        t.to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
+                    ),
+                },
+                log_tail,
+                home_dir: std::env::var("USERPROFILE")
+                    .or_else(|_| std::env::var("HOME"))
+                    .ok(),
+            };
+            let report = diagnostics::build_report(&input);
+            let outcome = match aum_platform::copy_to_clipboard(&report) {
+                Ok(()) => "Diagnostics copied to the clipboard. Paste them into your bug report."
+                    .to_owned(),
+                Err(e) => {
+                    // No clipboard: leave the report in a file the user can open instead.
+                    let file = dir.join("diagnostics-report.txt");
+                    match std::fs::write(&file, &report) {
+                        Ok(()) => format!(
+                            "Couldn't copy ({e}). The report is saved as {}",
+                            file.display()
+                        ),
+                        Err(w) => format!("Couldn't copy ({e}) or save the report ({w})."),
+                    }
+                }
+            };
+            let _ = slint::invoke_from_event_loop(move || {
+                with_app(|a| a.set_settings_message(outcome))
+            });
+        });
     }
 
     fn set_settings_message(&self, msg: String) {

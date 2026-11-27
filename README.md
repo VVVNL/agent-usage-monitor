@@ -126,6 +126,20 @@ out to keep it visible). Hover for the numbers; right-click for the menu.
   only if enough of it is still on a connected monitor. `Esc` hides it, `R` or `F5` refreshes.
   Modes: compact (one line), dark/light, opacity 30-100%, always-on-top, click-through.
   There is no taskbar button.
+- **Pace estimate** (a small line under a bar in the full widget): from one reading alone, "35% used,
+  resets in 4h 04m" says how much of the window has gone (the session is 5 hours, the weekly limit 7 days),
+  so the widget can say `Pace estimate: ~84% by reset` (amber from 85%) or, in red, `Pace estimate: runs out
+  in ~1h 44m` when the average pace so far would reach the limit before the reset. It needs no history, so
+  it reads the same on every computer for the same account. It is an **estimate**: it assumes the average
+  rate since the window opened continues, usage comes in bursts, and percentages are whole numbers. It is not
+  shown in the first 10% of a window, for a window of unknown length, when the limit is already reached, or
+  when the data is stale or the provider is in error (old numbers would mislead).
+- **Copy diagnostics** (Settings > Help): copies a short report for bug reports: versions (this app, `claude`,
+  `codex`), what each provider says, the limit lines it could not read, which settings are on and the app's
+  own recent log lines. It contains no usage numbers, conversations, accounts or file paths (your home folder
+  and user names are replaced, e-mail addresses removed), is cut to 8 KB, and goes to the clipboard only when
+  you click (or, if there is no clipboard, to `diagnostics-report.txt` in the settings folder). See
+  [docs/PRIVACY.md](docs/PRIVACY.md#copy-diagnostics).
 - **Settings…** (tray menu): provider on/off, path to the `claude` program, refresh interval
   (a dropdown of 1/5/15/30 minutes, default 5, plus a box to enter any whole number of minutes from 1 to 1440), launch at login, all widget options, and notification levels.
   Changes apply immediately.
@@ -142,7 +156,7 @@ out to keep it visible). Hover for the numbers; right-click for the menu.
   "unrecognised output" or "no data" rather than guessing. Fixtures live in
   `tests/fixtures/claude/usage`.
 - Percentages are whole numbers (all Claude Code prints), and reset times can wobble by a minute
-  between reads; alert logic accounts for that.
+  between reads; alert logic accounts for that. The pace estimate inherits both limits.
 - Session activity depends on a research-preview command (see above), only covers Claude Code (Codex has
   no session-listing interface), and counts only live processes: a closed terminal disappears and is
   not reported as finished. Subagents are not listed separately.
@@ -309,11 +323,16 @@ These were deliberately deferred and must be done before 1.0:
 - [ ] **Slint licence.** The UI uses Slint under its royalty-free desktop licence, which requires the
       attribution shown at the bottom of Settings. Confirm that is acceptable for an MIT project (the
       alternatives are GPLv3 for the whole app, or a commercial licence).
+- [ ] **Pace estimate and Copy diagnostics on a real desktop.** Unit-tested, and the widget layout was
+      rendered and inspected. Not yet seen: the extra widget line in the running app, and the clipboard
+      (`cargo test -p aum-platform -- --ignored` replaces the clipboard; it could not run on a locked PC,
+      where Windows refuses all clipboard access). Try Settings > Help > Copy diagnostics and paste.
 - [ ] **Code signing** (optional, removes the SmartScreen warning).
 - [ ] **Self-update on Windows, end to end.** Built and unit-tested (scripted `curl`, OpenSSL-signed
-      fixtures). The signing key is set up and release 0.11.3 carries `SHA256SUMS.txt.sig`. Still to do: a
-      newer release to update to. Install the 0.11.3 setup, publish the next release, then Settings >
-      Updates > Check now > Install, and confirm the new version runs and `updates\` is cleaned up.
+      fixtures); not yet run against a real signed release. Needs the update signing key set up
+      (docs/RELEASE_CHECKLIST.md, "Update signing key"), a release that carries `SHA256SUMS.txt.sig`, and a newer
+      release to update to: install the older setup, Settings > Updates > Check now > Install, and confirm the
+      new version runs and `updates\` is cleaned up.
 - [ ] **Update check: what the user sees.** Verified: the request, answer parser and decision against this
       project's real public release list (v0.11.0, including the ETag "unchanged" answer), the one-time
       question and its answers on Windows, and the failure path. Still to do when a release newer than the

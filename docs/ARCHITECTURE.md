@@ -2,12 +2,12 @@
 
 ```
 crates/
-  core        domain models, provenance, the Provider trait   (no I/O)
+  core        domain models, provenance, the Provider trait, the stateless pace forecast (`forecast`)   (no I/O)
   providers   Claude adapter (runs the CLI, parses /usage) and Codex adapter
               (JSON-RPC over `codex app-server`)                 (spawns processes)
   collector   per-provider polling tasks, backoff, cache         (tokio)
   store       settings / cache / notified files, monitor placement (JSON, atomic writes)
-  app         tray / menu bar + widget + settings UI             (Windows + macOS shell, tested logic)
+  app         tray / menu bar + widget + settings UI             (Windows + macOS shell, tested logic; `diagnostics` builds the redacted bug-report text)
   platform    the only unsafe code, one module per OS: opacity, rounded corners, monitors,
               launch at login, notifications (Windows: Win32/registry/WinRT; macOS: AppKit/LaunchAgent/osascript)
   update      optional "is there a newer release?" check: GitHub release list via the system `curl`,

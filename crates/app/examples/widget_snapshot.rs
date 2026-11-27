@@ -22,6 +22,23 @@ mod ui {
             percent,
             level,
             detail: detail.into(),
+            forecast: "".into(),
+            forecast_level: 0,
+        }
+    }
+
+    fn bar_with_forecast(
+        label: &str,
+        percent: i32,
+        level: i32,
+        detail: &str,
+        forecast: &str,
+        forecast_level: i32,
+    ) -> BarData {
+        BarData {
+            forecast: forecast.into(),
+            forecast_level,
+            ..bar(label, percent, level, detail)
         }
     }
 
@@ -79,9 +96,30 @@ mod ui {
             "",
             false,
             vec![
-                bar("Session", 35, 0, "resets in 4h 04m"),
-                bar("Weekly", 82, 1, "resets in 4d 12h"),
-                bar("Weekly (Fable)", 96, 2, "resets in 4d 12h"),
+                bar_with_forecast(
+                    "Session",
+                    35,
+                    0,
+                    "resets in 4h 04m",
+                    "Pace estimate: runs out in ~1h 44m",
+                    2,
+                ),
+                bar_with_forecast(
+                    "Weekly",
+                    82,
+                    1,
+                    "resets in 4d 12h",
+                    "Pace estimate: ~99% by reset",
+                    1,
+                ),
+                bar_with_forecast(
+                    "Weekly (Fable)",
+                    96,
+                    2,
+                    "resets in 4d 12h",
+                    "Pace estimate: ~84% by reset",
+                    0,
+                ),
             ],
             "Updated 1 min ago",
             "Claude Code  35% · 82%",
