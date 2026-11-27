@@ -87,7 +87,7 @@ project's Ed25519 key (`SHA256SUMS.txt.sig`, made by the publish job of `release
 GitHub secret `UPDATE_SIGNING_KEY`; the public key is compiled into the app (`PUBLIC_KEY_B64` in
 `crates/update/src/lib.rs`). Without either, releases still publish, installed copies only announce them.
 
-One-time setup (the private key never goes into the repository or into a chat):
+One-time setup, done for 0.11.3 (public key is in `PUBLIC_KEY_B64`; keep this section for rotation; the private key never goes into the repository or into a chat):
 
 ```bash
 openssl genpkey -algorithm ed25519 -out update-signing.pem

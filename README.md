@@ -311,10 +311,9 @@ These were deliberately deferred and must be done before 1.0:
       alternatives are GPLv3 for the whole app, or a commercial licence).
 - [ ] **Code signing** (optional, removes the SmartScreen warning).
 - [ ] **Self-update on Windows, end to end.** Built and unit-tested (scripted `curl`, OpenSSL-signed
-      fixtures); not yet run against a real signed release. Needs the update signing key set up
-      (docs/RELEASE_CHECKLIST.md, "Update signing key"), a release that carries `SHA256SUMS.txt.sig`, and a newer
-      release to update to: install the older setup, Settings > Updates > Check now > Install, and confirm the
-      new version runs and `updates\` is cleaned up.
+      fixtures). The signing key is set up and release 0.11.3 carries `SHA256SUMS.txt.sig`. Still to do: a
+      newer release to update to. Install the 0.11.3 setup, publish the next release, then Settings >
+      Updates > Check now > Install, and confirm the new version runs and `updates\` is cleaned up.
 - [ ] **Update check: what the user sees.** Verified: the request, answer parser and decision against this
       project's real public release list (v0.11.0, including the ETag "unchanged" answer), the one-time
       question and its answers on Windows, and the failure path. Still to do when a release newer than the

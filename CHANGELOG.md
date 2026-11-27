@@ -14,7 +14,7 @@ All notable changes. Versions before 1.0 are betas.
 ## 0.11.3
 
 - Rounded corners and an application icon on macOS; Windows installer and shortcuts use the new icon.
-- Public update-signing key is now built in, so releases signed by CI can be installed from the app (Windows installer copies only).
+- Public update-signing key is now built in, so releases signed by CI can be installed from the app (Windows installer copies only). 0.11.3 is the first release carrying `SHA256SUMS.txt.sig`; it can only be updated *from*, so the first real in-app update is 0.11.3 to the next release.
 
 - **Windows self-update (stage 2 of docs/research/auto-update.md).** A copy installed with the setup program
   offers "Update available: X — install…" in the tray menu and a button in Settings > Updates. After you

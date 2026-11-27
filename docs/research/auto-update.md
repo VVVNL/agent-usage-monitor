@@ -170,11 +170,11 @@ only** (portable stays notify-only). Choices that differ from the sketch above:
   installer is downloaded, and the installer is hashed again right before it runs.
 - Installed vs portable: the Inno uninstall entry's `InstallLocation` (key `{AppId}_is1`) must equal the running
   exe's folder. The installer script gained a `/aumupdate=1` switch that starts the new version afterwards.
-- No key compiled in (`PUBLIC_KEY_B64` empty) means updates are only announced: the feature fails closed.
+- A build with no key compiled in (`PUBLIC_KEY_B64` empty) only announces updates: the feature fails closed. The key has been set since 0.11.3.
 - Not done: Authenticode check of the installer (needs Windows code signing), delta updates, rollback beyond
   "nothing changes if verification fails", portable and macOS in-place updates.
 - Verified by tests with a scripted `curl` (tampered list, wrong key, swapped installer, redirects, size caps,
-  no key) and on Windows against GitHub only after the first signed release exists (see README pending list).
+  no key) and on Windows against GitHub only now that a signed release exists (0.11.3); still pending: update from 0.11.3 to a newer release (see README pending list).
 
 ## Implementation outline
 
