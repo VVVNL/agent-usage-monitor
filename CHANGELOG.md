@@ -2,6 +2,14 @@
 
 All notable changes. Versions before 1.0 are betas.
 
+## 0.11.6
+
+- **The pace estimate is drawn on the bar.** A faded extension runs from the fill to the expected end at the
+  reset (to the end of the bar when the limit would be reached first), coloured by the estimate (green, amber
+  from 85%, red). The text under the bar is shorter: `~84% by reset` / `Runs out in ~1h 44m` (it was
+  `Pace estimate: ...`). Same hiding rules as before; compact mode unchanged; the bar's accessible
+  description carries the text.
+
 ## 0.11.5
 
 - **Pace estimate under each bar of the widget.** From a single reading (percentage and reset time) and the
