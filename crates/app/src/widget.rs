@@ -22,11 +22,15 @@ pub struct BarRow {
     pub level: Level,
     /// "resets in 4h 04m" or "reset passed, refreshing".
     pub detail: String,
-    /// The pace estimate ("Pace estimate: runs out in ~1h 44m"), or empty when none applies: too early
+    /// The pace estimate ("Runs out in ~1h 44m"), or empty when none applies: too early
     /// in the window, the value is stale or in error, the limit is reached, or the window's length is
     /// unknown. See `aum_core::forecast`.
     pub forecast: String,
     pub forecast_level: Level,
+    /// Where the estimate says the bar will end at the reset (0..=100, never below `percent`; 100
+    /// when the limit would be reached first). The widget draws a faded extension from the fill to
+    /// here, coloured by `forecast_level`. `None` exactly when `forecast` is empty.
+    pub projected_percent: Option<u8>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -80,23 +84,25 @@ pub fn build_with_activity(
     }
 }
 
-/// Words and colour for a forecast. Red only when the limit would be reached before the reset; amber
-/// when the projection ends close to the limit.
-fn forecast_text(f: Option<Forecast>) -> (String, Level) {
+/// The estimate as short words, a colour and the end of the faded bar extension. Red only when the
+/// limit would be reached before the reset; amber when the projection ends close to the limit.
+fn forecast_view(f: Option<Forecast>, used: u8) -> (String, Level, Option<u8>) {
     match f {
         Some(Forecast::RunsOut { in_ }) => (
-            format!("Pace estimate: runs out in ~{}", format_countdown(in_)),
+            format!("Runs out in ~{}", format_countdown(in_)),
             Level::Critical,
+            Some(100),
         ),
         Some(Forecast::OnTrack { projected_percent }) => (
-            format!("Pace estimate: ~{projected_percent}% by reset"),
+            format!("~{projected_percent}% by reset"),
             if projected_percent >= 85 {
                 Level::Warn
             } else {
                 Level::Ok
             },
+            Some(projected_percent.max(used).min(100)),
         ),
-        Some(Forecast::TooEarly) | None => (String::new(), Level::Unknown),
+        Some(Forecast::TooEarly) | None => (String::new(), Level::Unknown, None),
     }
 }
 
@@ -115,10 +121,10 @@ fn section(st: &ProviderState, now: DateTime<Utc>, interval: Duration) -> Widget
                 Some(d) => format!("resets in {}", format_countdown(d)),
                 None => "reset passed, refreshing".to_owned(),
             };
-            let (forecast, forecast_level) = if can_forecast {
-                forecast_text(forecast(w, now))
+            let (forecast, forecast_level, projected_percent) = if can_forecast {
+                forecast_view(forecast(w, now), w.used_percent)
             } else {
-                (String::new(), Level::Unknown)
+                (String::new(), Level::Unknown, None)
             };
             bars.push(BarRow {
                 label: w.kind.label(),
@@ -127,6 +133,7 @@ fn section(st: &ProviderState, now: DateTime<Utc>, interval: Duration) -> Widget
                 detail,
                 forecast,
                 forecast_level,
+                projected_percent,
             });
             // Compact mode shows only the two headline limits.
             if matches!(w.kind, WindowKind::Session | WindowKind::Weekly) {
@@ -353,7 +360,7 @@ mod tests {
             0,
         );
         let b = &build(&[st], now(), IV).sections[0].bars[0];
-        assert_eq!(b.forecast, "Pace estimate: runs out in ~1h 44m");
+        assert_eq!(b.forecast, "Runs out in ~1h 44m");
         assert_eq!(b.forecast_level, Level::Critical);
     }
 
@@ -366,7 +373,7 @@ mod tests {
             0,
         );
         let b = &build(&[st], now(), IV).sections[0].bars[0];
-        assert_eq!(b.forecast, "Pace estimate: ~84% by reset");
+        assert_eq!(b.forecast, "~84% by reset");
         assert_eq!(b.forecast_level, Level::Ok);
         // 40% used, same time left: about 99%, which is close enough to warn.
         let st = state(
@@ -375,7 +382,7 @@ mod tests {
             0,
         );
         let b = &build(&[st], now(), IV).sections[0].bars[0];
-        assert_eq!(b.forecast, "Pace estimate: ~99% by reset");
+        assert_eq!(b.forecast, "~99% by reset");
         assert_eq!(b.forecast_level, Level::Warn);
     }
 
@@ -446,5 +453,105 @@ mod tests {
         let s = &build(&[st], now(), IV).sections[0];
         assert_eq!(s.bars[0].detail, "resets in 4h 04m");
         assert_eq!(s.compact, "Claude Code  35% · 34%");
+    }
+
+    // ----- the estimate drawn on the bar: a faded extension from the fill to the projected end -----
+
+    #[test]
+    fn the_bar_extends_to_the_projected_percent_or_to_full_when_it_runs_out() {
+        let bar = |windows, age| {
+            let st = state(windows, ConnectionStatus::Connected, age);
+            build(&[st], now(), IV).sections[0].bars[0].clone()
+        };
+        // Runs out: the ghost reaches the end of the bar.
+        let b = bar(vec![w(WindowKind::Session, 35, 244)], 0);
+        assert_eq!((b.percent, b.projected_percent), (Some(35), Some(100)));
+        // On track: it ends where the pace says the usage will be at the reset.
+        let b = bar(vec![w(WindowKind::Weekly, 34, 6000)], 0);
+        assert_eq!((b.percent, b.projected_percent), (Some(34), Some(84)));
+        // Near the limit: still drawn to the projected end (the colour is the forecast level).
+        let b = bar(vec![w(WindowKind::Weekly, 40, 6000)], 0);
+        assert_eq!(b.projected_percent, Some(99));
+        assert_eq!(b.forecast_level, Level::Warn);
+    }
+
+    #[test]
+    fn the_projection_never_ends_before_the_current_fill_and_never_exceeds_the_bar() {
+        for used in 0..100u32 {
+            for left in [30, 90, 150, 244, 290] {
+                let st = state(
+                    vec![w(WindowKind::Session, used, left)],
+                    ConnectionStatus::Connected,
+                    0,
+                );
+                let b = &build(&[st], now(), IV).sections[0].bars[0];
+                if let (Some(p), Some(end)) = (b.percent, b.projected_percent) {
+                    assert!(
+                        end >= p && end <= 100,
+                        "{used}% with {left} min left: {p} -> {end}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn no_extension_when_there_is_no_sound_estimate() {
+        let none =
+            |st: ProviderState| build(&[st], now(), IV).sections[0].bars[0].projected_percent;
+        assert_eq!(
+            none(state(
+                vec![w(WindowKind::Session, 3, 295)],
+                ConnectionStatus::Connected,
+                0
+            )),
+            None,
+            "too early"
+        );
+        assert_eq!(
+            none(state(
+                vec![w(WindowKind::Session, 98, -3)],
+                ConnectionStatus::Connected,
+                0
+            )),
+            None,
+            "rolled over"
+        );
+        assert_eq!(
+            none(state(
+                vec![w(WindowKind::Session, 100, 60)],
+                ConnectionStatus::Connected,
+                0
+            )),
+            None,
+            "full"
+        );
+        assert_eq!(
+            none(state(
+                vec![w(WindowKind::Named("3-day".into()), 40, 600)],
+                ConnectionStatus::Connected,
+                0
+            )),
+            None,
+            "unknown length"
+        );
+        assert_eq!(
+            none(state(
+                vec![w(WindowKind::Session, 35, 244)],
+                ConnectionStatus::Connected,
+                30
+            )),
+            None,
+            "stale"
+        );
+        assert_eq!(
+            none(state(
+                vec![w(WindowKind::Session, 35, 244)],
+                ConnectionStatus::Offline,
+                0
+            )),
+            None,
+            "offline"
+        );
     }
 }

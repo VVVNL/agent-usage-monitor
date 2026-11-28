@@ -32,6 +32,8 @@ export struct BarData {
     // Pace estimate line; empty = none. forecast-level: 0 ok, 1 warn, 2 critical.
     forecast: string,
     forecast-level: int,
+    // Where the bar is expected to end at the reset (0..100), or -1 for none.
+    projected: int,
 }
 
 export struct ChipData {
@@ -113,6 +115,7 @@ component Bar inherits VerticalLayout {
     accessible-value: d.percent >= 0 ? d.percent : 0;
     accessible-value-minimum: 0;
     accessible-value-maximum: 100;
+    accessible-description: d.forecast;
     HorizontalLayout {
         Text { text: d.label; color: Pal.subtext; font-size: 11px; }
         Text { text: d.percent >= 0 ? d.percent + "%" : "—"; color: Pal.text; font-size: 11px; font-weight: 600; horizontal-alignment: right; }
@@ -121,6 +124,16 @@ component Bar inherits VerticalLayout {
         height: 6px;
         border-radius: 3px;
         background: Pal.track;
+        // Pace estimate: a faded extension from the fill to where the bar is expected to end at the
+        // reset (full width when the limit would be reached first), coloured by the estimate's level.
+        // It starts a little under the fill's rounded end so there is no gap.
+        if d.percent >= 0 && d.projected > d.percent: Rectangle {
+            x: Math.max(0px, parent.width * Math.clamp(d.percent, 0, 100) / 100 - 3px);
+            width: parent.width * (Math.clamp(d.projected, 0, 100) - Math.clamp(d.percent, 0, 100)) / 100 + 3px;
+            height: parent.height;
+            border-radius: 3px;
+            background: (d.forecast-level == 2 ? Pal.crit : d.forecast-level == 1 ? Pal.warn : Pal.ok).with-alpha(0.38);
+        }
         Rectangle {
             x: 0;
             height: parent.height;

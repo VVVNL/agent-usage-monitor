@@ -126,10 +126,12 @@ out to keep it visible). Hover for the numbers; right-click for the menu.
   only if enough of it is still on a connected monitor. `Esc` hides it, `R` or `F5` refreshes.
   Modes: compact (one line), dark/light, opacity 30-100%, always-on-top, click-through.
   There is no taskbar button.
-- **Pace estimate** (a small line under a bar in the full widget): from one reading alone, "35% used,
-  resets in 4h 04m" says how much of the window has gone (the session is 5 hours, the weekly limit 7 days),
-  so the widget can say `Pace estimate: ~84% by reset` (amber from 85%) or, in red, `Pace estimate: runs out
-  in ~1h 44m` when the average pace so far would reach the limit before the reset. It needs no history, so
+- **Pace estimate** (in the full widget): from one reading alone, "35% used, resets in 4h 04m" says how much
+  of the window has gone (the session is 5 hours, the weekly limit 7 days). The bar shows it as a **faded
+  extension from the fill to where it is expected to end at the reset**, in the estimate's colour (grey-green
+  when comfortable, amber from 85%, red when the average pace so far would reach the limit first, in which
+  case the extension runs to the end of the bar), with a short line under the bar: `~84% by reset` or
+  `Runs out in ~1h 44m`. The bar also carries the estimate as its accessible description. It needs no history, so
   it reads the same on every computer for the same account. It is an **estimate**: it assumes the average
   rate since the window opened continues, usage comes in bursts, and percentages are whole numbers. It is not
   shown in the first 10% of a window, for a window of unknown length, when the limit is already reached, or

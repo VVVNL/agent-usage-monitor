@@ -24,6 +24,7 @@ mod ui {
             detail: detail.into(),
             forecast: "".into(),
             forecast_level: 0,
+            projected: -1,
         }
     }
 
@@ -34,10 +35,12 @@ mod ui {
         detail: &str,
         forecast: &str,
         forecast_level: i32,
+        projected: i32,
     ) -> BarData {
         BarData {
             forecast: forecast.into(),
             forecast_level,
+            projected,
             ..bar(label, percent, level, detail)
         }
     }
@@ -101,24 +104,19 @@ mod ui {
                     35,
                     0,
                     "resets in 4h 04m",
-                    "Pace estimate: runs out in ~1h 44m",
+                    "Runs out in ~1h 44m",
                     2,
+                    100,
                 ),
-                bar_with_forecast(
-                    "Weekly",
-                    82,
-                    1,
-                    "resets in 4d 12h",
-                    "Pace estimate: ~99% by reset",
-                    1,
-                ),
+                bar_with_forecast("Weekly", 82, 1, "resets in 4d 12h", "~99% by reset", 1, 99),
                 bar_with_forecast(
                     "Weekly (Fable)",
-                    96,
-                    2,
-                    "resets in 4d 12h",
-                    "Pace estimate: ~84% by reset",
+                    60,
                     0,
+                    "resets in 4d 12h",
+                    "~84% by reset",
+                    0,
+                    84,
                 ),
             ],
             "Updated 1 min ago",

@@ -445,6 +445,7 @@ fn to_section_data(m: &WidgetModel) -> Vec<SectionData> {
                         },
                         detail: b.detail.as_str().into(),
                         forecast: b.forecast.as_str().into(),
+                        projected: b.projected_percent.map_or(-1, i32::from),
                         forecast_level: match b.forecast_level {
                             icon::Level::Critical => 2,
                             icon::Level::Warn => 1,
